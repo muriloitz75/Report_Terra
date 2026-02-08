@@ -1,6 +1,7 @@
-fastapi
-uvicorn
-pandas
-pdfplumber
-python-multipart
-xlsxwriter
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+pandas==2.2.3
+pdfplumber==0.11.4
+python-multipart==0.0.12
+xlsxwriter==3.2.0
+
