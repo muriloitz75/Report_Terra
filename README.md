@@ -74,6 +74,66 @@ npm run dev
 
 Acesse a aplicação em: **http://localhost:3000**
 
+
+## 🚀 Deploy no Railway
+
+Este projeto está configurado para deploy no Railway como monorepo com 2 serviços separados.
+
+### Pré-requisitos
+
+1. Conta no [Railway](https://railway.app)
+2. Repositório conectado ao GitHub
+3. Código commitado e pushed
+
+### Configuração dos Serviços
+
+#### 1. Backend Service (FastAPI)
+
+No Railway Dashboard:
+
+1. **New Service** → Selecione o repositório
+2. **Settings**:
+   - **Root Directory**: `/` (raiz do projeto)
+   - **Build Command**: (deixar vazio - usa `nixpacks.toml`)
+   - **Start Command**: (deixar vazio - usa `nixpacks.toml`)
+3. **Deploy** e aguarde o build
+
+Após deploy, copie a URL do backend (ex: `https://backend-xyz.railway.app`)
+
+#### 2. Frontend Service (Next.js)
+
+No Railway Dashboard:
+
+1. **New Service** → Selecione o mesmo repositório
+2. **Settings**:
+   - **Root Directory**: `/frontend`
+   - **Build Command**: `npm run build`
+   - **Start Command**: `npm start`
+3. **Variables** → Adicionar:
+   - `NEXT_PUBLIC_API_URL`: Cole a URL do backend (do passo anterior)
+4. **Deploy** e aguarde o build
+
+### Verificação
+
+- **Backend**: Acesse `https://seu-backend.railway.app/docs` para ver a documentação da API
+- **Frontend**: Acesse `https://seu-frontend.railway.app` para usar a aplicação
+- **Teste**: Faça upload de um PDF e verifique se os dados são processados
+
+### Troubleshooting
+
+**Erro de build no backend**:
+- Verifique se `nixpacks.toml` está na raiz do projeto
+- Confirme que `requirements.txt` está presente
+
+**Frontend não conecta ao backend**:
+- Verifique se a variável `NEXT_PUBLIC_API_URL` está configurada corretamente
+- A URL deve incluir `https://` e não ter `/` no final
+
+**Erro de CORS**:
+- O backend já está configurado para aceitar todas as origens (`allow_origins=["*"]`)
+
+---
+
 ## 📂 Estrutura do Projeto
 
 ```

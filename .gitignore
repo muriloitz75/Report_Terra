@@ -1,9 +1,16 @@
-
 # Dependencies
 .venv/
 node_modules/
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+
+# Railway
+.railway/
 
 # Next.js
 .next/
