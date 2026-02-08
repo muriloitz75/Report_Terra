@@ -1,0 +1,11 @@
+[build]
+builder = "NIXPACKS"
+watchPatterns = ["frontend/**"]
+
+[build.nixpacksPlan]
+providers = ["node"]
+
+[deploy]
+startCommand = "cd frontend && npm start"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
