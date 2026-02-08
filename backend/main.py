@@ -28,6 +28,20 @@ app.add_middleware(
 # We will store the dataframe globally for this session
 DB = []
 
+@app.get("/")
+async def root():
+    """Health check endpoint - API está funcionando"""
+    return {
+        "status": "online",
+        "message": "Report Terra API está funcionando! 🚀",
+        "docs": "/docs",
+        "endpoints": {
+            "upload": "POST /upload - Upload de PDF",
+            "processes": "GET /processes - Listar processos",
+            "export": "GET /export - Exportar para Excel"
+        }
+    }
+
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     if not file.filename.endswith('.pdf'):
