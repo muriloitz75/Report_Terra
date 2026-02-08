@@ -1,28 +1,39 @@
 # Dependencies
 .venv/
-node_modules/
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+.venv/
 env/
 venv/
 
 # Railway
 .railway/
 
+# Environment
+.env
+.env.local
+.env.*.local
+.env.production.local
+.env.development.local
+
 # Next.js
 .next/
 out/
+node_modules/
 build/
 .DS_Store
+
+# Logs
+*.log
+server.logre
 
 # Data & Logs (Local)
 extracted_data.json
 skipped_lines.log
 pdf_inspection.json
-debug_filter.py
 
 # Env
 .env

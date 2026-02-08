@@ -11,10 +11,21 @@ import tempfile
 import logging
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+# Use INFO in production, DEBUG in development
+log_level = os.getenv("LOG_LEVEL", "INFO")
+logging.basicConfig(
+    level=getattr(logging, log_level),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+app = FastAPI(
+    title="Report Terra API",
+    description="API para processamento e análise de PDFs de processos governamentais",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
 
 app.add_middleware(
     CORSMiddleware,
