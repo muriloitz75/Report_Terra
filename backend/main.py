@@ -5,8 +5,14 @@ import shutil
 import os
 import pandas as pd
 from typing import List, Optional
+from pydantic import BaseModel
 from process_pdf import parse_pdf
 import tempfile
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -169,17 +175,21 @@ def get_processes(
     if month_filter:
         df = df[df['month_year'] == month_filter]
 
+    if status_filter:
+        logger.info(f"DEBUG: RAW status_filter='{status_filter}'")
+        # Support multiple statuses (comma-separated)
+        statuses = [s.strip() for s in status_filter.split(',')]
+        logger.info(f"DEBUG: Filtering by statuses={statuses}")
+        logger.info(f"DEBUG: Available statuses in DF: {df['status'].unique().tolist()}")
+        df = df[df['status'].isin(statuses)]
+
     if only_delayed:
         df = df[df['is_atrasado'] == True]
         
     if type_filter:
         df = df[df['tipo_solicitacao'] == type_filter]
 
-    if status_filter:
-        print(f"DEBUG: Filtering by status='{status_filter}'")
-        print(f"DEBUG: Available statuses: {df['status'].unique()}")
-        df = df[df['status'] == status_filter]
-        print(f"DEBUG: Records after filter: {len(df)}")
+
         
     if search:
         search = search.lower()
@@ -190,6 +200,15 @@ def get_processes(
             df['tipo_solicitacao'].str.lower().str.contains(search)
         )
         df = df[mask]
+    
+    # Conditional sorting:
+    # - If filtering only delayed: sort by delay days (descending - most delayed first)
+    # - Otherwise: sort by opening date (descending - most recent first)
+    if only_delayed:
+        df = df.sort_values('dias_atraso_calc', ascending=False)
+    else:
+        # Sort by opening date (most recent first)
+        df = df.sort_values('dt', ascending=False)
     
     # Pagination
     total_records = len(df)

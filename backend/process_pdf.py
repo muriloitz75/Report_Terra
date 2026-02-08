@@ -1,6 +1,10 @@
 import pdfplumber
 import re
 from datetime import datetime, timedelta
+import logging
+
+# Disable verbose pdfminer logs
+logging.getLogger('pdfminer').setLevel(logging.WARNING)
 
 def parse_pdf(pdf_path):
     processes = []
@@ -14,8 +18,8 @@ def parse_pdf(pdf_path):
     
     # Regex to capture the start of the line: ID + Contribuinte + Dates
     # Handling potential missing space before dates: (.+?)(\d{2}...)
-    # Updated to allow variable length IDs (found 8 digits in logs)
-    start_pattern = re.compile(r"^(\d+ - \d{4})\s+(.+?)(\d{2}/\d{2}/\d{4} \/ \d{2}/\d{2}/\d{4})")
+    # Updated to allow variable length IDs and optional leading whitespace
+    start_pattern = re.compile(r"^\s*(\d+ - \d{4})\s+(.+?)(\d{2}/\d{2}/\d{4} \/ \d{2}/\d{2}/\d{4})")
 
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
