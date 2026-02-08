@@ -6,7 +6,10 @@ def parse_pdf(pdf_path):
     processes = []
     
     # Status keywords to anchor the split
-    STATUS_KEYWORDS = ["ANDAMENTO", "ENCERRAMENTO", "DEFERIDO", "INDEFERIDO", "SUSPENSO", "CANCELADO"]
+    STATUS_KEYWORDS = [
+        "ANDAMENTO", "ENCERRAMENTO", "DEFERIDO", "INDEFERIDO", 
+        "SUSPENSO", "CANCELADO", "RETORNO", "EM DILIGENCIA", "PENDENCIA"
+    ]
     status_pattern = r"\s+(" + "|".join(STATUS_KEYWORDS) + r")\s+"
     
     # Regex to capture the start of the line: ID + Contribuinte + Dates

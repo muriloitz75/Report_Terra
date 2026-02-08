@@ -42,7 +42,7 @@ async def upload_file(file: UploadFile = File(...)):
         os.remove(tmp_path)
 
 @app.get("/stats")
-def get_stats():
+def get_stats(month_filter: Optional[str] = None):
     if not DB:
         return {
             "total": 0, "encerrados": 0, "andamento": 0, "atrasados": 0,
@@ -93,6 +93,44 @@ def get_stats():
     # Unique statuses for filter
     all_statuses = df['status'].unique().tolist() if 'status' in df.columns else []
 
+    # Apply Filters for KPIs and Charts (if month_filter is present)
+    # We calculate 'all_months' BEFORE filtering to keep the dropdown populated
+    available_months = []
+    if 'month_year' in df.columns:
+        available_months = sorted(df['month_year'].dropna().unique().tolist())
+
+    if month_filter:
+        if 'month_year' in df.columns:
+            df = df[df['month_year'] == month_filter]
+        else:
+             # If month_year wasn't created yet (empty dates), result matches nothing
+             df = df[0:0]
+
+    # Re-calculate KPIs on filtered data
+    total = len(df)
+    encerrados_count = len(df[df['status'].str.contains('ENCERRAMENTO', na=False)]) if not df.empty else 0
+    andamento_count = len(df[df['status'] == 'ANDAMENTO']) if not df.empty else 0
+    atrasados_count = len(df[df['is_atrasado'] == True]) if not df.empty else 0
+
+    # Re-calculate Charts on filtered data
+    # For evolution, if filtered by month, it will show only that month.
+    evolution_data = [] # Re-calc below if needed, or if df changed
+    if not df.empty and 'month_year' in df.columns:
+         evolution = df.groupby('month_year').agg(
+            total=('id', 'count'),
+            encerrados=('status', lambda x: x.str.contains('ENCERRAMENTO').sum()),
+            andamento=('status', lambda x: (x == 'ANDAMENTO').sum()),
+            atrasados=('is_atrasado', 'sum')
+        ).reset_index().sort_values('month_year')
+         evolution_data = evolution.to_dict('records')
+
+    # Re-calc Types
+    by_type_data = []
+    if not df.empty:
+        by_type = df['tipo_solicitacao'].value_counts().head(10).reset_index()
+        by_type.columns = ['type', 'count']
+        by_type_data = by_type.to_dict('records')
+
     return {
         "total": total,
         "encerrados": encerrados_count,
@@ -100,7 +138,8 @@ def get_stats():
         "atrasados": atrasados_count,
         "by_month": evolution_data,
         "by_type": by_type_data,
-        "all_statuses": all_statuses
+        "all_statuses": all_statuses,
+        "available_months": available_months
     }
 
 @app.get("/processes")
@@ -110,6 +149,7 @@ def get_processes(
     search: Optional[str] = None, 
     type_filter: Optional[str] = None,
     status_filter: Optional[str] = None,
+    month_filter: Optional[str] = None,
     only_delayed: bool = False
 ):
     if not DB:
@@ -117,7 +157,15 @@ def get_processes(
         
     df = pd.DataFrame(DB)
     
+    # Pre-process dates for filtering
+    if 'data_abertura' in df.columns:
+        df['dt'] = pd.to_datetime(df['data_abertura'], format='%d/%m/%Y', errors='coerce')
+        df['month_year'] = df['dt'].dt.strftime('%Y-%m')
+
     # Filter
+    if month_filter:
+        df = df[df['month_year'] == month_filter]
+
     if only_delayed:
         df = df[df['is_atrasado'] == True]
         
