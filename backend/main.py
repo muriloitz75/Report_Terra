@@ -1,0 +1,160 @@
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+import shutil
+import os
+import pandas as pd
+from typing import List, Optional
+from process_pdf import parse_pdf
+import tempfile
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# In-memory storage for simplicity (could be SQLite in future)
+# We will store the dataframe globally for this session
+DB = []
+
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="File must be a PDF")
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        shutil.copyfileobj(file.file, tmp)
+        tmp_path = tmp.name
+    
+    try:
+        data = parse_pdf(tmp_path)
+        global DB
+        DB = data # Replace current DB with new load
+        return {"message": "File processed successfully", "count": len(data)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        os.remove(tmp_path)
+
+@app.get("/stats")
+def get_stats():
+    if not DB:
+        return {
+            "total": 0, "encerrados": 0, "andamento": 0, "atrasados": 0,
+            "by_month": [], "by_type": []
+        }
+    
+    df = pd.DataFrame(DB)
+    
+    # KPIs
+    total = len(df)
+    encerrados = len(df[df['status'] == 'ENCERRAMENTO']) # Adjust based on exact status string
+    # Note: PDF has "ENCERRAMENTO", "DEFERIDO", "INDEFERIDO". Need to standardise?
+    # User asked for "Total Encerrados". Assuming strictly "ENCERRAMENTO" or all finished?
+    # I will count "ENCERRAMENTO" + "DEFERIDO" + "INDEFERIDO" as 'Finalized' in logic?
+    # Or just "ENCERRAMENTO" word? User's words: "Total Encerrados".
+    # I'll stick to 'ENCERRAMENTO' status keyword for now, or maybe grouped.
+    # Let's check status values in DB.
+    
+    # Better approach:
+    # Encerrados = Status contains "ENCERRAMENTO" (case insensitive?)
+    # Em Andamento = Status == "ANDAMENTO"
+    
+    encerrados_count = len(df[df['status'].str.contains('ENCERRAMENTO', na=False)])
+    andamento_count = len(df[df['status'] == 'ANDAMENTO'])
+    atrasados_count = len(df[df['is_atrasado'] == True])
+    
+    # Line Chart: Evolution by Entry Date (Month/Year)
+    if 'data_abertura' in df.columns and not df['data_abertura'].eq("").all():
+        df['dt'] = pd.to_datetime(df['data_abertura'], format='%d/%m/%Y', errors='coerce')
+        df['month_year'] = df['dt'].dt.strftime('%Y-%m') # Sortable
+        
+        evolution = df.groupby('month_year').agg(
+            total=('id', 'count'),
+            encerrados=('status', lambda x: x.str.contains('ENCERRAMENTO').sum()),
+            andamento=('status', lambda x: (x == 'ANDAMENTO').sum()),
+            atrasados=('is_atrasado', 'sum')
+        ).reset_index().sort_values('month_year')
+        
+        evolution_data = evolution.to_dict('records')
+    else:
+        evolution_data = []
+
+    # Bar Chart: Top Request Types
+    by_type = df['tipo_solicitacao'].value_counts().head(10).reset_index()
+    by_type.columns = ['type', 'count']
+    by_type_data = by_type.to_dict('records')
+
+    # Unique statuses for filter
+    all_statuses = df['status'].unique().tolist() if 'status' in df.columns else []
+
+    return {
+        "total": total,
+        "encerrados": encerrados_count,
+        "andamento": andamento_count,
+        "atrasados": atrasados_count,
+        "by_month": evolution_data,
+        "by_type": by_type_data,
+        "all_statuses": all_statuses
+    }
+
+@app.get("/processes")
+def get_processes(
+    page: int = 1, 
+    limit: int = 10, 
+    search: Optional[str] = None, 
+    type_filter: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    only_delayed: bool = False
+):
+    if not DB:
+        return {"data": [], "total": 0, "page": page, "pages": 0}
+        
+    df = pd.DataFrame(DB)
+    
+    # Filter
+    if only_delayed:
+        df = df[df['is_atrasado'] == True]
+        
+    if type_filter:
+        df = df[df['tipo_solicitacao'] == type_filter]
+
+    if status_filter:
+        print(f"DEBUG: Filtering by status='{status_filter}'")
+        print(f"DEBUG: Available statuses: {df['status'].unique()}")
+        df = df[df['status'] == status_filter]
+        print(f"DEBUG: Records after filter: {len(df)}")
+        
+    if search:
+        search = search.lower()
+        # Search across multiple columns
+        mask = (
+            df['id'].str.lower().str.contains(search) | 
+            df['contribuinte'].str.lower().str.contains(search) |
+            df['tipo_solicitacao'].str.lower().str.contains(search)
+        )
+        df = df[mask]
+    
+    # Pagination
+    total_records = len(df)
+    total_pages = (total_records + limit - 1) // limit
+    
+    start = (page - 1) * limit
+    end = start + limit
+    
+    paginated = df.iloc[start:end].to_dict('records')
+    
+    return {
+        "data": paginated,
+        "total": total_records,
+        "page": page,
+        "pages": total_pages
+    }
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)

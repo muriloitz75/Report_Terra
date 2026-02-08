@@ -1,0 +1,22 @@
+
+# Dependencies
+.venv/
+node_modules/
+__pycache__/
+*.py[cod]
+
+# Next.js
+.next/
+out/
+build/
+.DS_Store
+
+# Data & Logs (Local)
+extracted_data.json
+skipped_lines.log
+pdf_inspection.json
+debug_filter.py
+
+# Env
+.env
+.env.local
