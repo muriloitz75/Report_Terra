@@ -108,17 +108,20 @@ def get_stats(month_filter: Optional[str] = None):
 
     # Re-calculate KPIs on filtered data
     total = len(df)
-    encerrados_count = len(df[df['status'].str.contains('ENCERRAMENTO', na=False)]) if not df.empty else 0
+    
+    # Encerrados now includes: ENCERRAMENTO, DEFERIDO, INDEFERIDO
+    encerrados_mask = df['status'].str.contains('ENCERRAMENTO|DEFERIDO|INDEFERIDO', na=False, case=False)
+    encerrados_count = len(df[encerrados_mask]) if not df.empty else 0
+    
     andamento_count = len(df[df['status'] == 'ANDAMENTO']) if not df.empty else 0
     atrasados_count = len(df[df['is_atrasado'] == True]) if not df.empty else 0
 
     # Re-calculate Charts on filtered data
-    # For evolution, if filtered by month, it will show only that month.
-    evolution_data = [] # Re-calc below if needed, or if df changed
+    evolution_data = [] 
     if not df.empty and 'month_year' in df.columns:
          evolution = df.groupby('month_year').agg(
             total=('id', 'count'),
-            encerrados=('status', lambda x: x.str.contains('ENCERRAMENTO').sum()),
+            encerrados=('status', lambda x: x.str.contains('ENCERRAMENTO|DEFERIDO|INDEFERIDO', na=False, case=False).sum()),
             andamento=('status', lambda x: (x == 'ANDAMENTO').sum()),
             atrasados=('is_atrasado', 'sum')
         ).reset_index().sort_values('month_year')
