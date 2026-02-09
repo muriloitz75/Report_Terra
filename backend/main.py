@@ -6,7 +6,7 @@ import os
 import pandas as pd
 from typing import List, Optional
 from pydantic import BaseModel
-from process_pdf import parse_pdf
+from .process_pdf import parse_pdf
 import tempfile
 import logging
 
