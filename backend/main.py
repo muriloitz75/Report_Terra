@@ -12,7 +12,12 @@ import logging
 
 # Configure logging
 # Use INFO in production, DEBUG in development
-log_level = os.getenv("LOG_LEVEL", "INFO")
+log_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
+valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+if log_level_str not in valid_levels:
+    print(f"Warning: Invalid LOG_LEVEL '{log_level_str}'. Defaulting to INFO.")
+    log_level_str = "INFO"
+log_level = log_level_str
 logging.basicConfig(
     level=getattr(logging, log_level),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
