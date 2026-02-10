@@ -6,7 +6,7 @@ import { uploadPDF, getStats, getProcesses, exportExcel, clearRecords, KPIStats,
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FileText, Upload, RefreshCw, AlertCircle, CheckCircle, Clock, ListFilter, Loader2, Search, Filter, BarChart3, Download, Trash2 } from 'lucide-react';
+import { FileText, Upload, RefreshCw, AlertCircle, CheckCircle, Check, Clock, ListFilter, Loader2, Search, Filter, BarChart3, Download, Trash2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 export default function Dashboard() {
@@ -18,7 +18,7 @@ export default function Dashboard() {
   // Filters
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [monthFilter, setMonthFilter] = useState('');
   const [onlyDelayed, setOnlyDelayed] = useState(false);
@@ -115,7 +115,7 @@ export default function Dashboard() {
                   setProcesses(null);
                   setDbLoaded(false);
                   setSearch('');
-                  setTypeFilter('');
+                  setTypeFilter([]);
                   setStatusFilter([]);
                   setMonthFilter('');
                   setOnlyDelayed(false);
@@ -279,29 +279,93 @@ export default function Dashboard() {
                 className="w-full"
               />
             </div>
-            <div className="w-full md:w-48">
-              <select
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                value={typeFilter}
-                onChange={(e) => {
-                  setTypeFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="">Todos os Tipos</option>
-                {stats?.by_type.map((t) => (
-                  <option key={t.type} value={t.type}>{t.type}</option>
-                ))}
-              </select>
-            </div>
             <div className="w-full md:w-64 relative">
-              {/* Custom Multi-Select Dropdown */}
+              {/* Custom Multi-Select Dropdown - Type */}
               <div className="relative group">
                 <button
                   className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => {
-                    const el = document.getElementById('status-dropdown');
-                    if (el) el.classList.toggle('hidden');
+                    const dd = document.getElementById('type-dropdown');
+                    const ov = document.getElementById('type-overlay');
+                    const isHidden = dd?.classList.contains('hidden');
+                    // Close other dropdown first
+                    document.getElementById('status-dropdown')?.classList.add('hidden');
+                    document.getElementById('status-overlay')?.classList.add('hidden');
+                    dd?.classList.toggle('hidden');
+                    if (isHidden) ov?.classList.remove('hidden');
+                    else ov?.classList.add('hidden');
+                  }}
+                >
+                  <span className="truncate">
+                    {typeFilter.length === 0 ? "Todos os Tipos" :
+                      typeFilter.length === 1 ? typeFilter[0] :
+                        `${typeFilter.length} selecionados`}
+                  </span>
+                  <ListFilter className="h-4 w-4 opacity-50" />
+                </button>
+
+                {/* Dropdown Content */}
+                <div id="type-dropdown" className="hidden absolute z-10 w-full mt-1 bg-white dark:bg-slate-900 border rounded-md shadow-lg max-h-60 overflow-auto p-1">
+                  <div
+                    className="flex items-center space-x-2 px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-pointer"
+                    onClick={() => {
+                      setTypeFilter([]);
+                      setPage(1);
+                    }}
+                  >
+                    <div className={`w-4 h-4 shrink-0 border rounded flex items-center justify-center ${typeFilter.length === 0 ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
+                      {typeFilter.length === 0 && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    <span className="text-sm">Todos</span>
+                  </div>
+                  {(stats?.all_types || []).map((t) => (
+                    <div
+                      key={t}
+                      className="flex items-center space-x-2 px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTypeFilter(prev => {
+                          const newFilters = prev.includes(t)
+                            ? prev.filter(f => f !== t)
+                            : [...prev, t];
+                          setPage(1);
+                          return newFilters;
+                        });
+                      }}
+                    >
+                      <div className={`w-4 h-4 shrink-0 border rounded flex items-center justify-center ${typeFilter.includes(t) ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
+                        {typeFilter.includes(t) && <Check className="w-3 h-3 text-white" />}
+                      </div>
+                      <span className="text-sm truncate">{t}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Overlay to close on click outside */}
+              <div
+                className="fixed inset-0 z-[5] hidden"
+                id="type-overlay"
+                onClick={() => {
+                  document.getElementById('type-dropdown')?.classList.add('hidden');
+                  document.getElementById('type-overlay')?.classList.add('hidden');
+                }}
+              />
+            </div>
+            <div className="w-full md:w-64 relative">
+              {/* Custom Multi-Select Dropdown - Status */}
+              <div className="relative group">
+                <button
+                  className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => {
+                    const dd = document.getElementById('status-dropdown');
+                    const ov = document.getElementById('status-overlay');
+                    const isHidden = dd?.classList.contains('hidden');
+                    // Close other dropdown first
+                    document.getElementById('type-dropdown')?.classList.add('hidden');
+                    document.getElementById('type-overlay')?.classList.add('hidden');
+                    dd?.classList.toggle('hidden');
+                    if (isHidden) ov?.classList.remove('hidden');
+                    else ov?.classList.add('hidden');
                   }}
                 >
                   <span className="truncate">
@@ -321,8 +385,8 @@ export default function Dashboard() {
                       setPage(1);
                     }}
                   >
-                    <div className={`w-4 h-4 border rounded flex items-center justify-center ${statusFilter.length === 0 ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
-                      {statusFilter.length === 0 && <CheckCircle className="w-3 h-3 text-white" />}
+                    <div className={`w-4 h-4 shrink-0 border rounded flex items-center justify-center ${statusFilter.length === 0 ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
+                      {statusFilter.length === 0 && <Check className="w-3 h-3 text-white" />}
                     </div>
                     <span className="text-sm">Todas</span>
                   </div>
@@ -331,7 +395,7 @@ export default function Dashboard() {
                       key={s}
                       className="flex items-center space-x-2 px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded cursor-pointer"
                       onClick={(e) => {
-                        e.stopPropagation(); // keep open
+                        e.stopPropagation();
                         setStatusFilter(prev => {
                           const newFilters = prev.includes(s)
                             ? prev.filter(f => f !== s)
@@ -341,38 +405,37 @@ export default function Dashboard() {
                         });
                       }}
                     >
-                      <div className={`w-4 h-4 border rounded flex items-center justify-center ${statusFilter.includes(s) ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
-                        {statusFilter.includes(s) && <CheckCircle className="w-3 h-3 text-white" />}
+                      <div className={`w-4 h-4 shrink-0 border rounded flex items-center justify-center ${statusFilter.includes(s) ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
+                        {statusFilter.includes(s) && <Check className="w-3 h-3 text-white" />}
                       </div>
-                      <span className="text-sm">{s}</span>
+                      <span className="text-sm truncate">{s}</span>
                     </div>
                   ))}
                 </div>
               </div>
-              {/* Overlay to close on click outside (simple implementation) */}
+              {/* Overlay to close on click outside */}
               <div
-                className="fixed inset-0 z-0 hidden"
-                id="status-dropdown-overlay"
+                className="fixed inset-0 z-[5] hidden"
+                id="status-overlay"
                 onClick={() => {
                   document.getElementById('status-dropdown')?.classList.add('hidden');
-                  document.getElementById('status-dropdown-overlay')?.classList.add('hidden');
+                  document.getElementById('status-overlay')?.classList.add('hidden');
                 }}
               />
             </div>
-            <div className="flex items-center space-x-2 border rounded-md px-4 py-2 bg-slate-50">
-              <input
-                type="checkbox"
-                id="delayed-check"
-                checked={onlyDelayed}
-                onChange={(e) => {
-                  setOnlyDelayed(e.target.checked);
-                  setPage(1);
-                }}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <label htmlFor="delayed-check" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+            <div
+              className="flex items-center space-x-2 border rounded-md px-4 py-2 bg-slate-50 cursor-pointer"
+              onClick={() => {
+                setOnlyDelayed(!onlyDelayed);
+                setPage(1);
+              }}
+            >
+              <div className={`w-4 h-4 shrink-0 border rounded flex items-center justify-center ${onlyDelayed ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
+                {onlyDelayed && <Check className="w-3 h-3 text-white" />}
+              </div>
+              <span className="text-sm font-medium leading-none cursor-pointer">
                 Apenas Atrasados
-              </label>
+              </span>
             </div>
           </div>
 

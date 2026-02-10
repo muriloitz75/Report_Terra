@@ -42,6 +42,10 @@ A ferramenta automatiza a leitura de arquivos PDF, identifica processos atrasado
 -   Node.js (v18+)
 -   Python (v3.10+)
 
+### 🚀 Forma Rápida (Recomendado)
+
+Se você estiver no Windows, basta clicar duas vezes no arquivo **`iniciar_projeto.bat`** na raiz do projeto. Ele abrirá automaticamente o Backend e o Frontend em janelas separadas.
+
 ### 1. Backend (API)
 
 ```bash

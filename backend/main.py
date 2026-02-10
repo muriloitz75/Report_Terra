@@ -135,6 +135,9 @@ def get_stats(month_filter: Optional[str] = None):
     # Unique statuses for filter
     all_statuses = df['status'].unique().tolist() if 'status' in df.columns else []
 
+    # Unique types for filter (all, not just top 10)
+    all_types = sorted(df['tipo_solicitacao'].dropna().unique().tolist()) if 'tipo_solicitacao' in df.columns else []
+
     # Apply Filters for KPIs and Charts (if month_filter is present)
     # We calculate 'all_months' BEFORE filtering to keep the dropdown populated
     available_months = []
@@ -184,6 +187,7 @@ def get_stats(month_filter: Optional[str] = None):
         "by_month": evolution_data,
         "by_type": by_type_data,
         "all_statuses": all_statuses,
+        "all_types": all_types,
         "available_months": available_months
     }
 
@@ -223,7 +227,8 @@ def get_processes(
         df = df[df['is_atrasado'] == True]
         
     if type_filter:
-        df = df[df['tipo_solicitacao'] == type_filter]
+        types = [t.strip() for t in type_filter.split(',')]
+        df = df[df['tipo_solicitacao'].isin(types)]
 
 
         
@@ -296,7 +301,8 @@ def export_excel(
         df = df[df['is_atrasado'] == True]
 
     if type_filter:
-        df = df[df['tipo_solicitacao'] == type_filter]
+        types = [t.strip() for t in type_filter.split(',')]
+        df = df[df['tipo_solicitacao'].isin(types)]
 
     if search:
         search_lower = search.lower()
