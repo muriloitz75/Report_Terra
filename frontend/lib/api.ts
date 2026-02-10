@@ -77,3 +77,8 @@ export const exportExcel = async (search = '', typeFilter = '', statusFilter: st
     link.remove();
     window.URL.revokeObjectURL(url);
 };
+
+export const clearRecords = async (): Promise<{ message: string; cleared: number }> => {
+    const response = await axios.delete(`${API_URL}/clear`);
+    return response.data;
+};

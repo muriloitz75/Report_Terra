@@ -75,6 +75,14 @@ async def upload_file(file: UploadFile = File(...)):
     finally:
         os.remove(tmp_path)
 
+@app.delete("/clear")
+def clear_records():
+    """Clear all in-memory process records."""
+    global DB
+    count = len(DB)
+    DB = []
+    return {"message": f"{count} registros removidos com sucesso.", "cleared": count}
+
 @app.get("/stats")
 def get_stats(month_filter: Optional[str] = None):
     if not DB:

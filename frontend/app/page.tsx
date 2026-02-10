@@ -2,11 +2,11 @@
 "use client"
 
 import { useState, useEffect } from 'react';
-import { uploadPDF, getStats, getProcesses, exportExcel, KPIStats, Process, PaginatedProcesses } from '@/lib/api';
+import { uploadPDF, getStats, getProcesses, exportExcel, clearRecords, KPIStats, Process, PaginatedProcesses } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FileText, Upload, RefreshCw, AlertCircle, CheckCircle, Clock, ListFilter, Loader2, Search, Filter, BarChart3, Download } from 'lucide-react';
+import { FileText, Upload, RefreshCw, AlertCircle, CheckCircle, Clock, ListFilter, Loader2, Search, Filter, BarChart3, Download, Trash2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 export default function Dashboard() {
@@ -101,6 +101,34 @@ export default function Dashboard() {
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
+          {dbLoaded && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 gap-1.5"
+              disabled={loading}
+              onClick={async () => {
+                if (!confirm('Tem certeza que deseja limpar todos os registros? Esta ação não pode ser desfeita.')) return;
+                try {
+                  await clearRecords();
+                  setStats(null);
+                  setProcesses(null);
+                  setDbLoaded(false);
+                  setSearch('');
+                  setTypeFilter('');
+                  setStatusFilter([]);
+                  setMonthFilter('');
+                  setOnlyDelayed(false);
+                  setPage(1);
+                } catch (error) {
+                  alert('Erro ao limpar registros');
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4" />
+              Limpar Registros
+            </Button>
+          )}
           <div className="relative">
             <Input
               type="file"
