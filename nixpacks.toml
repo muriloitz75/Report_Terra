@@ -1,15 +1,10 @@
-[providers]
-# Force both providers
-python = "3.11"
-node = "20"
-
 [phases.setup]
 nixPkgs = ["python311", "nodejs_20"]
 
 [phases.build]
 cmds = [
     "cd frontend && npm install && npm run build",
-    "cd backend && pip install -r ../requirements.txt"
+    "cd backend && pip install -r requirements.txt"
 ]
 
 [start]
