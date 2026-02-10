@@ -84,85 +84,86 @@ def clear_records():
     return {"message": f"{count} registros removidos com sucesso.", "cleared": count}
 
 @app.get("/stats")
-def get_stats(month_filter: Optional[str] = None):
+def get_stats(
+    search: Optional[str] = None, 
+    type_filter: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    only_delayed: bool = False
+):
     if not DB:
         return {
             "total": 0, "encerrados": 0, "andamento": 0, "atrasados": 0,
-            "by_month": [], "by_type": []
+            "by_month": [], "by_type": [], 
+            "all_statuses": [], "all_types": [], "available_months": []
         }
     
     df = pd.DataFrame(DB)
     
-    # KPIs
-    total = len(df)
-    encerrados = len(df[df['status'] == 'ENCERRAMENTO']) # Adjust based on exact status string
-    # Note: PDF has "ENCERRAMENTO", "DEFERIDO", "INDEFERIDO". Need to standardise?
-    # User asked for "Total Encerrados". Assuming strictly "ENCERRAMENTO" or all finished?
-    # I will count "ENCERRAMENTO" + "DEFERIDO" + "INDEFERIDO" as 'Finalized' in logic?
-    # Or just "ENCERRAMENTO" word? User's words: "Total Encerrados".
-    # I'll stick to 'ENCERRAMENTO' status keyword for now, or maybe grouped.
-    # Let's check status values in DB.
-    
-    # Better approach:
-    # Encerrados = Status contains "ENCERRAMENTO" (case insensitive?)
-    # Em Andamento = Status == "ANDAMENTO"
-    
-    encerrados_count = len(df[df['status'].str.contains('ENCERRAMENTO', na=False)])
-    andamento_count = len(df[df['status'] == 'ANDAMENTO'])
-    atrasados_count = len(df[df['is_atrasado'] == True])
-    
-    # Line Chart: Evolution by Entry Date (Month/Year)
+    # Pre-process dates if needed
     if 'data_abertura' in df.columns and not df['data_abertura'].eq("").all():
         df['dt'] = pd.to_datetime(df['data_abertura'], format='%d/%m/%Y', errors='coerce')
-        df['month_year'] = df['dt'].dt.strftime('%Y-%m') # Sortable
-        
-        evolution = df.groupby('month_year').agg(
-            total=('id', 'count'),
-            encerrados=('status', lambda x: x.str.contains('ENCERRAMENTO').sum()),
-            andamento=('status', lambda x: (x == 'ANDAMENTO').sum()),
-            atrasados=('is_atrasado', 'sum')
-        ).reset_index().sort_values('month_year')
-        
-        evolution_data = evolution.to_dict('records')
-    else:
-        evolution_data = []
+        df['month_year'] = df['dt'].dt.strftime('%Y-%m')
 
-    # Bar Chart: Top Request Types
-    by_type = df['tipo_solicitacao'].value_counts().head(10).reset_index()
-    by_type.columns = ['type', 'count']
-    by_type_data = by_type.to_dict('records')
-
-    # Unique statuses for filter
-    all_statuses = df['status'].unique().tolist() if 'status' in df.columns else []
-
-    # Unique types for filter (all, not just top 10)
+    # 1. Calculate Options (from Unfiltered Data)
+    all_statuses = sorted(df['status'].dropna().unique().tolist()) if 'status' in df.columns else []
     all_types = sorted(df['tipo_solicitacao'].dropna().unique().tolist()) if 'tipo_solicitacao' in df.columns else []
+    available_months = sorted(df['month_year'].dropna().unique().tolist()) if 'month_year' in df.columns else []
 
-    # Apply Filters for KPIs and Charts (if month_filter is present)
-    # We calculate 'all_months' BEFORE filtering to keep the dropdown populated
-    available_months = []
-    if 'month_year' in df.columns:
-        available_months = sorted(df['month_year'].dropna().unique().tolist())
+    # 2. Apply Filters
+    # Search
+    if search:
+        search_lower = search.lower()
+        df = df[
+            df['id'].astype(str).str.contains(search_lower, case=False) |
+            df['contribuinte'].astype(str).str.contains(search_lower, case=False) |
+            df['tipo_solicitacao'].astype(str).str.contains(search_lower, case=False)
+        ]
 
-    if month_filter:
-        if 'month_year' in df.columns:
-            df = df[df['month_year'] == month_filter]
-        else:
-             # If month_year wasn't created yet (empty dates), result matches nothing
-             df = df[0:0]
+    # Type Filter
+    if type_filter:
+        types = type_filter.split(',')
+        if 'tipo_solicitacao' in df.columns:
+            df = df[df['tipo_solicitacao'].isin(types)]
+            
+    # Status Filter
+    if status_filter:
+        statuses = status_filter.split(',')
+        if 'status' in df.columns:
+            df = df[df['status'].isin(statuses)]
 
-    # Re-calculate KPIs on filtered data
+    # Date Range Filter
+    if start_date:
+        if 'dt' in df.columns:
+            df = df[df['dt'] >= pd.to_datetime(start_date)]
+    if end_date:
+        if 'dt' in df.columns:
+            # Add time to include the end date fully if using datetime comparison
+            # But pd.to_datetime('2024-01-01') is 00:00:00.
+            # If df['dt'] matches matches 00:00:00 (which it does via format), it works.
+            df = df[df['dt'] <= pd.to_datetime(end_date)]
+
+    # Only Delayed
+    if only_delayed:
+        if 'is_atrasado' in df.columns:
+            df = df[df['is_atrasado'] == True]
+
+    # 3. Calculate KPIs (from Filtered Data)
     total = len(df)
     
-    # Encerrados now includes: ENCERRAMENTO, DEFERIDO, INDEFERIDO
-    encerrados_mask = df['status'].str.contains('ENCERRAMENTO|DEFERIDO|INDEFERIDO', na=False, case=False)
+    # Encerrados logic: includes "ENCERRAMENTO", "DEFERIDO", "INDEFERIDO"
+    # Case insensitive just in case
+    encerrados_mask = df['status'].str.contains('ENCERRAMENTO|DEFERIDO|INDEFERIDO', na=False, case=False) if 'status' in df.columns else pd.Series([False] * len(df))
     encerrados_count = len(df[encerrados_mask]) if not df.empty else 0
     
-    andamento_count = len(df[df['status'] == 'ANDAMENTO']) if not df.empty else 0
-    atrasados_count = len(df[df['is_atrasado'] == True]) if not df.empty else 0
-
-    # Re-calculate Charts on filtered data
-    evolution_data = [] 
+    andamento_count = len(df[df['status'] == 'ANDAMENTO']) if not df.empty and 'status' in df.columns else 0
+    atrasados_count = len(df[df['is_atrasado'] == True]) if not df.empty and 'is_atrasado' in df.columns else 0
+    
+    # 4. Calculate Charts (from Filtered Data)
+    
+    # Evolution by Month
+    evolution_data = []
     if not df.empty and 'month_year' in df.columns:
          evolution = df.groupby('month_year').agg(
             total=('id', 'count'),
@@ -172,9 +173,9 @@ def get_stats(month_filter: Optional[str] = None):
         ).reset_index().sort_values('month_year')
          evolution_data = evolution.to_dict('records')
 
-    # Re-calc Types
+    # Top Types
     by_type_data = []
-    if not df.empty:
+    if not df.empty and 'tipo_solicitacao' in df.columns:
         by_type = df['tipo_solicitacao'].value_counts().head(10).reset_index()
         by_type.columns = ['type', 'count']
         by_type_data = by_type.to_dict('records')
@@ -191,6 +192,8 @@ def get_stats(month_filter: Optional[str] = None):
         "available_months": available_months
     }
 
+
+
 @app.get("/processes")
 def get_processes(
     page: int = 1, 
@@ -198,7 +201,8 @@ def get_processes(
     search: Optional[str] = None, 
     type_filter: Optional[str] = None,
     status_filter: Optional[str] = None,
-    month_filter: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     only_delayed: bool = False
 ):
     if not DB:
@@ -212,8 +216,11 @@ def get_processes(
         df['month_year'] = df['dt'].dt.strftime('%Y-%m')
 
     # Filter
-    if month_filter:
-        df = df[df['month_year'] == month_filter]
+    # Filter by Date Range
+    if start_date and 'dt' in df.columns:
+        df = df[df['dt'] >= pd.to_datetime(start_date)]
+    if end_date and 'dt' in df.columns:
+        df = df[df['dt'] <= pd.to_datetime(end_date)]
 
     if status_filter:
         logger.info(f"DEBUG: RAW status_filter='{status_filter}'")
@@ -272,7 +279,8 @@ def export_excel(
     search: Optional[str] = None,
     type_filter: Optional[str] = None,
     status_filter: Optional[str] = None,
-    month_filter: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     only_delayed: bool = False
 ):
     """Export filtered processes to a formatted Excel file."""
@@ -290,8 +298,10 @@ def export_excel(
         df['month_year'] = df['dt'].dt.strftime('%Y-%m')
 
     # Apply filters (same logic as /processes)
-    if month_filter:
-        df = df[df['month_year'] == month_filter]
+    if start_date and 'dt' in df.columns:
+        df = df[df['dt'] >= pd.to_datetime(start_date)]
+    if end_date and 'dt' in df.columns:
+        df = df[df['dt'] <= pd.to_datetime(end_date)]
 
     if status_filter:
         statuses = [s.strip() for s in status_filter.split(',')]

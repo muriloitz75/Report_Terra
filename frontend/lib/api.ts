@@ -47,24 +47,24 @@ export const uploadPDF = async (file: File) => {
     return response.data;
 };
 
-export const getStats = async (monthFilter = ''): Promise<KPIStats> => {
-    const params = { month_filter: monthFilter };
+export const getStats = async (startDate = '', endDate = ''): Promise<KPIStats> => {
+    const params = { start_date: startDate, end_date: endDate };
     const response = await axios.get(`${API_URL}/stats`, { params });
     return response.data;
 };
 
-export const getProcesses = async (page = 1, limit = 10, search = '', typeFilter: string[] = [], statusFilter: string[] = [], monthFilter = '', onlyDelayed = false): Promise<PaginatedProcesses> => {
+export const getProcesses = async (page = 1, limit = 10, search = '', typeFilter: string[] = [], statusFilter: string[] = [], startDate = '', endDate = '', onlyDelayed = false): Promise<PaginatedProcesses> => {
     const typeParam = typeFilter.join(',');
     const statusParam = statusFilter.join(',');
-    const params = { page, limit, search, type_filter: typeParam, status_filter: statusParam, month_filter: monthFilter, only_delayed: onlyDelayed };
+    const params = { page, limit, search, type_filter: typeParam, status_filter: statusParam, start_date: startDate, end_date: endDate, only_delayed: onlyDelayed };
     const response = await axios.get(`${API_URL}/processes`, { params });
     return response.data;
 };
 
-export const exportExcel = async (search = '', typeFilter: string[] = [], statusFilter: string[] = [], monthFilter = '', onlyDelayed = false): Promise<void> => {
+export const exportExcel = async (search = '', typeFilter: string[] = [], statusFilter: string[] = [], startDate = '', endDate = '', onlyDelayed = false): Promise<void> => {
     const typeParam = typeFilter.join(',');
     const statusParam = statusFilter.join(',');
-    const params = { search, type_filter: typeParam, status_filter: statusParam, month_filter: monthFilter, only_delayed: onlyDelayed };
+    const params = { search, type_filter: typeParam, status_filter: statusParam, start_date: startDate, end_date: endDate, only_delayed: onlyDelayed };
     const response = await axios.get(`${API_URL}/export-excel`, { params, responseType: 'blob' });
 
     const contentDisposition = response.headers['content-disposition'];

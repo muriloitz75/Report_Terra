@@ -8,6 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FileText, Upload, RefreshCw, AlertCircle, CheckCircle, Check, Clock, ListFilter, Loader2, Search, Filter, BarChart3, Download, Trash2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
+import { DateRange } from "react-day-picker";
+import { format } from "date-fns";
+import { DatePickerWithRange } from "@/components/date-range-picker";
+import { ModeToggle } from "@/components/mode-toggle";
 
 export default function Dashboard() {
   const [stats, setStats] = useState<KPIStats | null>(null);
@@ -20,7 +24,7 @@ export default function Dashboard() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
-  const [monthFilter, setMonthFilter] = useState('');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [onlyDelayed, setOnlyDelayed] = useState(false);
   const [dbLoaded, setDbLoaded] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -28,11 +32,14 @@ export default function Dashboard() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const statsData = await getStats(monthFilter);
+      const from = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
+      const to = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
+
+      const statsData = await getStats(from, to);
       setStats(statsData);
 
       console.log('DEBUG: calling getProcesses with statusFilter:', statusFilter);
-      const processesData = await getProcesses(page, 10, search, typeFilter, statusFilter, monthFilter, onlyDelayed);
+      const processesData = await getProcesses(page, 10, search, typeFilter, statusFilter, from, to, onlyDelayed);
       setProcesses(processesData);
 
       if (statsData.total > 0 || statsData.available_months?.length) setDbLoaded(true);
@@ -45,7 +52,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadData();
-  }, [page, search, typeFilter, statusFilter, monthFilter, onlyDelayed]); // Reload when filters change
+  }, [page, search, typeFilter, statusFilter, dateRange, onlyDelayed]); // Reload when filters change
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
@@ -54,7 +61,7 @@ export default function Dashboard() {
     try {
       await uploadPDF(e.target.files[0]);
       // clear filters on new upload
-      setMonthFilter('');
+      setDateRange(undefined);
       await loadData();
       setDbLoaded(true);
     } catch (error) {
@@ -65,7 +72,7 @@ export default function Dashboard() {
   };
 
   const statusOptions = stats?.all_statuses || ["ENCERRAMENTO", "ANDAMENTO", "INDEFERIDO", "DEFERIDO"];
-  const monthOptions = stats?.available_months || [];
+
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-8 space-y-8 font-sans">
@@ -79,28 +86,23 @@ export default function Dashboard() {
         </div>
 
         <div className="flex gap-4 items-center">
-          {/* Month Filter */}
-          <div className="w-48">
-            <select
-              className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              value={monthFilter}
-              onChange={(e) => {
-                setMonthFilter(e.target.value);
+          {/* Date Range Filter */}
+          <div className="w-auto">
+            <DatePickerWithRange
+              date={dateRange}
+              setDate={(range) => {
+                setDateRange(range);
                 setPage(1);
               }}
-              disabled={!dbLoaded}
-            >
-              <option value="">Todos os Per&iacute;odos</option>
-              {monthOptions.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
+              className={!dbLoaded ? "opacity-50 pointer-events-none" : ""}
+            />
           </div>
 
           <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
+
           {dbLoaded && (
             <Button
               variant="outline"
@@ -117,7 +119,7 @@ export default function Dashboard() {
                   setSearch('');
                   setTypeFilter([]);
                   setStatusFilter([]);
-                  setMonthFilter('');
+                  setDateRange(undefined);
                   setOnlyDelayed(false);
                   setPage(1);
                 } catch (error) {
@@ -151,6 +153,7 @@ export default function Dashboard() {
               </Button>
             </label>
           </div>
+          <ModeToggle />
         </div>
       </header>
 
@@ -455,7 +458,9 @@ export default function Dashboard() {
                 onClick={async () => {
                   setExporting(true);
                   try {
-                    await exportExcel(search, typeFilter, statusFilter, monthFilter, onlyDelayed);
+                    const from = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
+                    const to = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
+                    await exportExcel(search, typeFilter, statusFilter, from, to, onlyDelayed);
                   } catch (error) {
                     alert('Erro ao exportar arquivo Excel');
                   } finally {
