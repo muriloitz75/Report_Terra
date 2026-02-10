@@ -255,7 +255,12 @@ def get_processes(
 
 # Mount static files (Frontend)
 # Only mount if directory exists (in production or after local build)
-static_dir = "frontend/out"
+# Mount static files (Frontend)
+# Calculate absolute path to frontend/out (sibling of backend)
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(backend_dir)
+static_dir = os.path.join(project_root, "frontend", "out")
+
 if os.path.isdir(os.path.join(static_dir, "_next")):
     app.mount("/_next", StaticFiles(directory=os.path.join(static_dir, "_next")), name="next-static")
 
