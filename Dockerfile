@@ -36,5 +36,5 @@ ENV PORT=8000
 ENV LOG_LEVEL=INFO
 
 # Comando de Inicialização
-# Usa a variável de ambiente PORT fornecida pelo Railway
-CMD sh -c "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT}"
+# Usa exec form com sh -c para garantir a expansão da variável PORT
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
