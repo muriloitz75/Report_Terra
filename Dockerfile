@@ -4,7 +4,7 @@ FROM node:22-alpine AS frontend_build
 WORKDIR /app/frontend
 
 COPY frontend/package*.json ./
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 COPY frontend/ ./
 # Ignorar checagem de tipos e linting para garantir build em produção se houver warnings menores
