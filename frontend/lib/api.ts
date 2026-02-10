@@ -1,8 +1,9 @@
 
 import axios from 'axios';
 
-// Use environment variable for API URL, fallback to localhost for development
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// In production (unified deploy), use relative URL (empty string = same origin).
+// In development, set NEXT_PUBLIC_API_URL=http://localhost:8000
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export interface KPIStats {
     total: number;
