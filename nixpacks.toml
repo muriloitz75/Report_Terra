@@ -1,3 +1,8 @@
+[providers]
+# Force both providers
+python = "3.11"
+node = "20"
+
 [phases.setup]
 nixPkgs = ["python311", "nodejs_20"]
 
