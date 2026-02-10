@@ -46,18 +46,13 @@ app.add_middleware(
 # We will store the dataframe globally for this session
 DB = []
 
-@app.get("/")
-async def root():
+@app.get("/api/health")
+async def health_check():
     """Health check endpoint - API está funcionando"""
     return {
         "status": "online",
         "message": "Report Terra API está funcionando! 🚀",
-        "docs": "/docs",
-        "endpoints": {
-            "upload": "POST /upload - Upload de PDF",
-            "processes": "GET /processes - Listar processos",
-            "export": "GET /export - Exportar para Excel"
-        }
+        "docs": "/docs"
     }
 
 @app.post("/upload")
@@ -263,6 +258,13 @@ def get_processes(
 static_dir = "frontend/out"
 if os.path.isdir(os.path.join(static_dir, "_next")):
     app.mount("/_next", StaticFiles(directory=os.path.join(static_dir, "_next")), name="next-static")
+
+@app.get("/")
+async def serve_spa_root():
+    index_path = os.path.join(static_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"message": "Frontend not built (run 'npm run build')"}
 
 @app.get("/{full_path:path}")
 async def serve_react_app(full_path: str):
