@@ -6,7 +6,7 @@ import { uploadPDF, getStats, getProcesses, exportExcel, clearRecords, KPIStats,
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FileText, Upload, RefreshCw, AlertCircle, CheckCircle, Check, Clock, ListFilter, Loader2, Search, Filter, BarChart3, Download, Trash2 } from 'lucide-react';
+import { FileText, Upload, RefreshCw, AlertCircle, CheckCircle, Check, Clock, ListFilter, Loader2, Search, Filter, BarChart3, Download, Trash2, FilterX } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
@@ -427,13 +427,13 @@ export default function Dashboard() {
               />
             </div>
             <div
-              className="flex items-center space-x-2 border rounded-md px-4 py-2 bg-slate-50 cursor-pointer"
+              className="flex items-center space-x-2 border rounded-md px-4 py-2 bg-slate-50 dark:bg-slate-950 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
               onClick={() => {
                 setOnlyDelayed(!onlyDelayed);
                 setPage(1);
               }}
             >
-              <div className={`w-4 h-4 shrink-0 border rounded flex items-center justify-center ${onlyDelayed ? 'bg-blue-600 border-blue-600' : 'border-slate-300'}`}>
+              <div className={`w-4 h-4 shrink-0 border rounded flex items-center justify-center ${onlyDelayed ? 'bg-blue-600 border-blue-600' : 'border-slate-300 dark:border-slate-600'}`}>
                 {onlyDelayed && <Check className="w-3 h-3 text-white" />}
               </div>
               <span className="text-sm font-medium leading-none cursor-pointer">
@@ -475,6 +475,24 @@ export default function Dashboard() {
                   <Download className="w-4 h-4" />
                 )}
                 {exporting ? 'Exportando...' : 'Exportar Excel'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-muted-foreground hover:text-red-600 hover:border-red-200"
+                onClick={() => {
+                  setSearch('');
+                  setTypeFilter([]);
+                  setStatusFilter([]);
+                  setDateRange(undefined);
+                  setOnlyDelayed(false);
+                  setPage(1);
+                }}
+                disabled={loading}
+                title="Limpar Filtros"
+              >
+                <FilterX className="w-4 h-4" />
+                <span className="sr-only sm:not-sr-only">Limpar</span>
               </Button>
             </div>
           </div>
