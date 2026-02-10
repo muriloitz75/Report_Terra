@@ -7,12 +7,12 @@ nixPkgs = ["python311", "nodejs_20"]
 [phases.install]
 cmds = [
     "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install -r requirements.txt",
-    "cd frontend && npm install"
+    "npm install --prefix /app/frontend"
 ]
 
 [phases.build]
 cmds = [
-    "cd frontend && npm run build"
+    "npm run build --prefix /app/frontend"
 ]
 
 [start]
