@@ -36,5 +36,6 @@ ENV PORT=8000
 ENV LOG_LEVEL=INFO
 
 # Comando de Inicialização
-# Usa exec form com sh -c para garantir a expansão da variável PORT
-CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Comando de Inicialização
+# Usa Python para iniciar o Uvicorn, evitando problemas de expansão de variáveis no shell
+CMD ["python", "-c", "import os; import uvicorn; uvicorn.run('backend.main:app', host='0.0.0.0', port=int(os.environ.get('PORT', 8000)))"]
