@@ -1,20 +1,21 @@
 # Manual Mode: Disable auto-discovery to prevent overrides
 providers = []
 
+[variables]
+PIP_BREAK_SYSTEM_PACKAGES = "1"
+
 [phases.setup]
 nixPkgs = ["python311", "nodejs_20", "python311Packages.pip"]
 
 [phases.install]
 cmds = [
     "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install -r requirements.txt",
-    "npm install --prefix /app/frontend"
+    "npm install --prefix /app/frontend",
+    "npm run build --prefix /app/frontend"
 ]
 
 [phases.build]
-dependsOn = ["install"]
-cmds = [
-    "npm run build --prefix /app/frontend"
-]
+cmds = ["true"]
 
 [start]
 cmd = ". /opt/venv/bin/activate && uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
