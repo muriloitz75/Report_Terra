@@ -1,4 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import shutil
@@ -255,6 +257,29 @@ def get_processes(
         "page": page,
         "pages": total_pages
     }
+
+# Mount static files (Frontend)
+# Only mount if directory exists (in production or after local build)
+static_dir = "frontend/out"
+if os.path.isdir(os.path.join(static_dir, "_next")):
+    app.mount("/_next", StaticFiles(directory=os.path.join(static_dir, "_next")), name="next-static")
+
+@app.get("/{full_path:path}")
+async def serve_react_app(full_path: str):
+    """Serve the React app for any other route"""
+    # API routes are prioritized (defined above)
+    
+    # Check if file exists in frontend/out
+    file_path = os.path.join(static_dir, full_path)
+    if os.path.exists(file_path) and os.path.isfile(file_path):
+        return FileResponse(file_path)
+    
+    # If not found, return index.html (SPA)
+    index_path = os.path.join(static_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+        
+    return {"message": "Frontend not built or not found (run 'npm run build' in frontend/)"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
