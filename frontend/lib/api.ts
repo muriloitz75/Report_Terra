@@ -58,3 +58,22 @@ export const getProcesses = async (page = 1, limit = 10, search = '', typeFilter
     const response = await axios.get(`${API_URL}/processes`, { params });
     return response.data;
 };
+
+export const exportExcel = async (search = '', typeFilter = '', statusFilter: string[] = [], monthFilter = '', onlyDelayed = false): Promise<void> => {
+    const statusParam = statusFilter.join(',');
+    const params = { search, type_filter: typeFilter, status_filter: statusParam, month_filter: monthFilter, only_delayed: onlyDelayed };
+    const response = await axios.get(`${API_URL}/export-excel`, { params, responseType: 'blob' });
+
+    const contentDisposition = response.headers['content-disposition'];
+    const filenameMatch = contentDisposition?.match(/filename="?(.+?)"?$/);
+    const filename = filenameMatch ? filenameMatch[1] : 'Report_Terra_Processos.xlsx';
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+};

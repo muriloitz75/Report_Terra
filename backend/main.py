@@ -1,10 +1,11 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import shutil
 import os
+import io
 import pandas as pd
 from typing import List, Optional
 from pydantic import BaseModel
@@ -252,6 +253,203 @@ def get_processes(
         "page": page,
         "pages": total_pages
     }
+
+@app.get("/export-excel")
+def export_excel(
+    search: Optional[str] = None,
+    type_filter: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    month_filter: Optional[str] = None,
+    only_delayed: bool = False
+):
+    """Export filtered processes to a formatted Excel file."""
+    import xlsxwriter
+    from datetime import datetime
+
+    if not DB:
+        raise HTTPException(status_code=400, detail="Nenhum dado disponível para exportar.")
+
+    df = pd.DataFrame(DB)
+
+    # Pre-process dates
+    if 'data_abertura' in df.columns:
+        df['dt'] = pd.to_datetime(df['data_abertura'], format='%d/%m/%Y', errors='coerce')
+        df['month_year'] = df['dt'].dt.strftime('%Y-%m')
+
+    # Apply filters (same logic as /processes)
+    if month_filter:
+        df = df[df['month_year'] == month_filter]
+
+    if status_filter:
+        statuses = [s.strip() for s in status_filter.split(',')]
+        df = df[df['status'].isin(statuses)]
+
+    if only_delayed:
+        df = df[df['is_atrasado'] == True]
+
+    if type_filter:
+        df = df[df['tipo_solicitacao'] == type_filter]
+
+    if search:
+        search_lower = search.lower()
+        mask = (
+            df['id'].str.lower().str.contains(search_lower) |
+            df['contribuinte'].str.lower().str.contains(search_lower) |
+            df['tipo_solicitacao'].str.lower().str.contains(search_lower)
+        )
+        df = df[mask]
+
+    # Sort by date (most recent first)
+    if only_delayed and 'dias_atraso_calc' in df.columns:
+        df = df.sort_values('dias_atraso_calc', ascending=False)
+    elif 'dt' in df.columns:
+        df = df.sort_values('dt', ascending=False)
+
+    # Build Excel in memory
+    output = io.BytesIO()
+    workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    worksheet = workbook.add_worksheet('Processos')
+
+    # --- Formats ---
+    header_fmt = workbook.add_format({
+        'bold': True,
+        'font_color': '#FFFFFF',
+        'bg_color': '#1E3A5F',
+        'border': 1,
+        'border_color': '#B0BEC5',
+        'align': 'center',
+        'valign': 'vcenter',
+        'font_size': 11,
+        'text_wrap': True,
+    })
+    cell_fmt = workbook.add_format({
+        'border': 1,
+        'border_color': '#D0D5DD',
+        'font_size': 10,
+        'valign': 'vcenter',
+    })
+    cell_center_fmt = workbook.add_format({
+        'border': 1,
+        'border_color': '#D0D5DD',
+        'font_size': 10,
+        'align': 'center',
+        'valign': 'vcenter',
+    })
+    cell_right_fmt = workbook.add_format({
+        'border': 1,
+        'border_color': '#D0D5DD',
+        'font_size': 10,
+        'align': 'right',
+        'valign': 'vcenter',
+    })
+    delay_fmt = workbook.add_format({
+        'border': 1,
+        'border_color': '#D0D5DD',
+        'font_size': 10,
+        'align': 'right',
+        'valign': 'vcenter',
+        'bold': True,
+        'font_color': '#DC2626',
+    })
+    # Status formats
+    status_green = workbook.add_format({
+        'border': 1, 'border_color': '#D0D5DD', 'font_size': 10,
+        'align': 'center', 'valign': 'vcenter',
+        'bg_color': '#DCFCE7', 'font_color': '#166534',
+    })
+    status_red = workbook.add_format({
+        'border': 1, 'border_color': '#D0D5DD', 'font_size': 10,
+        'align': 'center', 'valign': 'vcenter',
+        'bg_color': '#FEE2E2', 'font_color': '#991B1B',
+    })
+    status_blue = workbook.add_format({
+        'border': 1, 'border_color': '#D0D5DD', 'font_size': 10,
+        'align': 'center', 'valign': 'vcenter',
+        'bg_color': '#DBEAFE', 'font_color': '#1E40AF',
+    })
+    status_orange = workbook.add_format({
+        'border': 1, 'border_color': '#D0D5DD', 'font_size': 10,
+        'align': 'center', 'valign': 'vcenter',
+        'bg_color': '#FFEDD5', 'font_color': '#9A3412',
+    })
+    status_gray = workbook.add_format({
+        'border': 1, 'border_color': '#D0D5DD', 'font_size': 10,
+        'align': 'center', 'valign': 'vcenter',
+        'bg_color': '#F3F4F6', 'font_color': '#374151',
+    })
+
+    # Title row
+    title_fmt = workbook.add_format({
+        'bold': True, 'font_size': 14, 'font_color': '#1E3A5F',
+    })
+    subtitle_fmt = workbook.add_format({
+        'font_size': 10, 'font_color': '#64748B', 'italic': True,
+    })
+    worksheet.merge_range('A1:F1', 'Report Terra - Processos', title_fmt)
+    export_time = datetime.now().strftime('%d/%m/%Y %H:%M')
+    filters_desc = []
+    if month_filter:
+        filters_desc.append(f"Período: {month_filter}")
+    if status_filter:
+        filters_desc.append(f"Situação: {status_filter}")
+    if type_filter:
+        filters_desc.append(f"Tipo: {type_filter}")
+    if search:
+        filters_desc.append(f"Busca: {search}")
+    if only_delayed:
+        filters_desc.append("Apenas Atrasados")
+    subtitle = f"Exportado em {export_time}"
+    if filters_desc:
+        subtitle += f" | Filtros: {', '.join(filters_desc)}"
+    subtitle += f" | Total: {len(df)} registros"
+    worksheet.merge_range('A2:F2', subtitle, subtitle_fmt)
+
+    # Headers (row 3, index 2)
+    headers = ['Nº Proc. / Ano', 'Contribuinte', 'Data Abertura', 'Situação', 'Tipo de Solicitação', 'Dias Atraso']
+    col_widths = [18, 35, 15, 20, 40, 14]
+    for col, (header, width) in enumerate(zip(headers, col_widths)):
+        worksheet.write(3, col, header, header_fmt)
+        worksheet.set_column(col, col, width)
+
+    # Data rows
+    def get_status_fmt(status_val):
+        if any(s in str(status_val) for s in ['ENCERRAMENTO', 'DEFERIDO']):
+            return status_green
+        if any(s in str(status_val) for s in ['INDEFERIDO', 'CANCELADO']):
+            return status_red
+        if str(status_val) in ['ANDAMENTO', 'EM DILIGENCIA']:
+            return status_blue
+        if str(status_val) in ['RETORNO', 'PENDENCIA', 'SUSPENSO']:
+            return status_orange
+        return status_gray
+
+    for row_idx, (_, row) in enumerate(df.iterrows(), start=4):
+        worksheet.write(row_idx, 0, str(row.get('id', '')), cell_center_fmt)
+        worksheet.write(row_idx, 1, str(row.get('contribuinte', '')), cell_fmt)
+        worksheet.write(row_idx, 2, str(row.get('data_abertura', '')), cell_center_fmt)
+        worksheet.write(row_idx, 3, str(row.get('status', '')), get_status_fmt(row.get('status', '')))
+        worksheet.write(row_idx, 4, str(row.get('tipo_solicitacao', '')), cell_fmt)
+
+        is_delayed = row.get('is_atrasado', False)
+        delay_days = row.get('dias_atraso_calc', 0)
+        if is_delayed and delay_days:
+            worksheet.write(row_idx, 5, f"{delay_days} dias", delay_fmt)
+        else:
+            worksheet.write(row_idx, 5, '-', cell_center_fmt)
+
+    # Freeze header row
+    worksheet.freeze_panes(4, 0)
+    worksheet.set_row(3, 22)
+
+    workbook.close()
+    output.seek(0)
+
+    filename = f"Report_Terra_Processos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(
+        output,
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+    )
 
 # Mount static files (Frontend)
 # Only mount if directory exists (in production or after local build)

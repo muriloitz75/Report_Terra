@@ -2,11 +2,11 @@
 "use client"
 
 import { useState, useEffect } from 'react';
-import { uploadPDF, getStats, getProcesses, KPIStats, Process, PaginatedProcesses } from '@/lib/api';
+import { uploadPDF, getStats, getProcesses, exportExcel, KPIStats, Process, PaginatedProcesses } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FileText, Upload, RefreshCw, AlertCircle, CheckCircle, Clock, ListFilter, Loader2, Search, Filter, BarChart3 } from 'lucide-react';
+import { FileText, Upload, RefreshCw, AlertCircle, CheckCircle, Clock, ListFilter, Loader2, Search, Filter, BarChart3, Download } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 export default function Dashboard() {
@@ -23,6 +23,7 @@ export default function Dashboard() {
   const [monthFilter, setMonthFilter] = useState('');
   const [onlyDelayed, setOnlyDelayed] = useState(false);
   const [dbLoaded, setDbLoaded] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -352,8 +353,33 @@ export default function Dashboard() {
               <ListFilter className="w-5 h-5 text-blue-600" />
               <span className="font-semibold text-slate-700 dark:text-slate-200">Processos Listados</span>
             </div>
-            <div className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-100 px-3 py-1 rounded-full text-sm font-bold">
-              {processes?.total || 0} registros
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-100 px-3 py-1 rounded-full text-sm font-bold">
+                {processes?.total || 0} registros
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={exporting || !processes?.total}
+                onClick={async () => {
+                  setExporting(true);
+                  try {
+                    await exportExcel(search, typeFilter, statusFilter, monthFilter, onlyDelayed);
+                  } catch (error) {
+                    alert('Erro ao exportar arquivo Excel');
+                  } finally {
+                    setExporting(false);
+                  }
+                }}
+                className="gap-1.5"
+              >
+                {exporting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                {exporting ? 'Exportando...' : 'Exportar Excel'}
+              </Button>
             </div>
           </div>
 
