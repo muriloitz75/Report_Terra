@@ -2,7 +2,7 @@
 providers = []
 
 [phases.setup]
-nixPkgs = ["python311", "nodejs_20"]
+nixPkgs = ["python311", "nodejs_20", "python311Packages.pip"]
 
 [phases.install]
 cmds = [
@@ -11,6 +11,7 @@ cmds = [
 ]
 
 [phases.build]
+dependsOn = ["install"]
 cmds = [
     "npm run build --prefix /app/frontend"
 ]
