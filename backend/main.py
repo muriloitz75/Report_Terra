@@ -101,6 +101,10 @@ def get_stats(
     
     df = pd.DataFrame(DB)
     
+    # Normalize Request Type to avoid duplicates (e.g. "Tipo A" vs "Tipo A ")
+    if 'tipo_solicitacao' in df.columns:
+        df['tipo_solicitacao'] = df['tipo_solicitacao'].astype(str).str.strip().str.replace(r'\s+', ' ', regex=True)
+
     # Pre-process dates if needed
     if 'data_abertura' in df.columns and not df['data_abertura'].eq("").all():
         df['dt'] = pd.to_datetime(df['data_abertura'], format='%d/%m/%Y', errors='coerce')
@@ -210,6 +214,10 @@ def get_processes(
         
     df = pd.DataFrame(DB)
     
+    # Normalize Request Type to avoid duplicates (e.g. "Tipo A" vs "Tipo A ")
+    if 'tipo_solicitacao' in df.columns:
+        df['tipo_solicitacao'] = df['tipo_solicitacao'].astype(str).str.strip().str.replace(r'\s+', ' ', regex=True)
+
     # Pre-process dates for filtering
     if 'data_abertura' in df.columns:
         df['dt'] = pd.to_datetime(df['data_abertura'], format='%d/%m/%Y', errors='coerce')
@@ -291,6 +299,10 @@ def export_excel(
         raise HTTPException(status_code=400, detail="Nenhum dado disponível para exportar.")
 
     df = pd.DataFrame(DB)
+
+    # Normalize Request Type to avoid duplicates (e.g. "Tipo A" vs "Tipo A ")
+    if 'tipo_solicitacao' in df.columns:
+        df['tipo_solicitacao'] = df['tipo_solicitacao'].astype(str).str.strip().str.replace(r'\s+', ' ', regex=True)
 
     # Pre-process dates
     if 'data_abertura' in df.columns:

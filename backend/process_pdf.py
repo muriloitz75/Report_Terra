@@ -2,9 +2,21 @@ import pdfplumber
 import re
 from datetime import datetime, timedelta
 import logging
+import unicodedata
 
 # Disable verbose pdfminer logs
 logging.getLogger('pdfminer').setLevel(logging.WARNING)
+
+def normalize_text(text):
+    """Normalize text: remove accents, standardize dashes, uppercase."""
+    if not text: return ""
+    # Normalize unicode characters (e.g. decompose accents)
+    nfkd_form = unicodedata.normalize('NFKD', text)
+    # Filter out non-spacing mark characters (accents)
+    text_no_accents = "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+    # Replace various dashes with standard hyphen
+    text_normalized = text_no_accents.replace('–', '-').replace('—', '-').upper()
+    return text_normalized.strip()
 
 def parse_pdf(pdf_path):
     processes = []
@@ -69,10 +81,33 @@ def parse_pdf(pdf_path):
                     sector_current = "N/A"
                     request_type_full = rest_after_status
                     
-                    if "DIRETORIA DE ARRECADAÇ" in rest_after_status:
-                        parts = rest_after_status.split("DIRETORIA DE ARRECADAÇ")
-                        sector_current = "DIRETORIA DE ARRECADAÇ"
-                        request_type_full = parts[1].strip() if len(parts) > 1 else ""
+                    # Regex flexível para capturar setores conhecidos
+                    # Procura pelo setor em qualquer lugar da string após o status
+                    # Grupos: 1=Lixo/Prefixo, 2=Setor, 3=Tipo de Solicitação
+                    sector_pattern = re.compile(r"(.*?)(DIRETORIA DE ARRECADA.*?|PROTOCOLO E ATENDIMEN.*?|GABINETE.*?)\s+(.*)")
+                    
+                    sector_match = sector_pattern.search(rest_after_status)
+                    
+                    if sector_match:
+                        # group(1) é o que vem antes (ex: "PARCIAL "), ignoramos ou juntamos ao setor se fizer sentido.
+                        # Por enquanto, vamos ignorar o prefixo sujo e pegar o setor limpo.
+                        sector_current = sector_match.group(2).strip()
+                        request_type_full = sector_match.group(3).strip()
+                    else:
+                        # Fallback: Tenta separar por "DIRETORIA" genérico se não casou com o acima
+                        if "DIRETORIA" in rest_after_status:
+                             parts = rest_after_status.split("DIRETORIA", 1) # Split apenas na primeira ocorrência
+                             if len(parts) > 1:
+                                 # Tenta inferir se é um setor válido
+                                 # Assume que DIRETORIA é o início do setor
+                                 # Mas o split removeu o termo.
+                                 # Vamos tentar pegar tudo a partir de DIRETORIA
+                                 idx = rest_after_status.find("DIRETORIA")
+                                 sector_current = rest_after_status[idx:] # Pega tudo... arriscado se o tipo estiver depois
+                                 # Melhor abordagem: Se tiver DIRETORIA, assume que o setor vai até o fim SE não tiver mais espaços grandes?
+                                 # Ou tenta quebrar no próximo espaço duplo?
+                                 # Por enquanto, se falhar no regex principal, vamos assumir N/A para evitar sujar o tipo.
+                                 pass
                     
                     # Clean up Request Type (remove trailing days digits if separate)
                     # Example: "BAIXA DE DÉBITOS SIMPLE 8" -> "BAIXA DE DÉBITOS SIMPLE", "8"
@@ -84,6 +119,10 @@ def parse_pdf(pdf_path):
                             request_type_full = request_type_full[:days_match.start()].strip()
                         except:
                             pass
+                    
+                    # Normalize Request Type (remove extra spaces and inconsistent whitespace)
+                    if request_type_full:
+                        request_type_full = " ".join(request_type_full.split())
                             
                     # Calculate 'is_delayed' based on USER RULE: 30 days after entry
                     is_delayed = False
@@ -125,7 +164,58 @@ def parse_pdf(pdf_path):
     # Debug: Print skipped lines to a file
     # with open("skipped_lines.log", "w", encoding="utf-8") as f:
     #     pass
+    
+    # --- Post-Processing: Deduplicate Request Types ---
+    # Heuristic: Map longer types to shorter types if they start with the shorter type.
+    # This handles cases where "Column 1" (Type) is merged with "Column 2" (Title/Detail).
+    # Example: "CANCELAMENTO DE NOTAS" vs "CANCELAMENTO DE NOTAS CANCELAMENTO DE NOTA F"
+    
+    # 1. Collect all unique types
+    # First, normalize all types in the processes list itself
+    for p in processes:
+        p['tipo_solicitacao'] = normalize_text(p['tipo_solicitacao'])
+
+    unique_types = sorted(list(set(p['tipo_solicitacao'] for p in processes)), key=len)
+    
+    # 2. Build mapping (Long -> Shortest Valid Prefix)
+    # Actually we want the Longest Valid Prefix to be safe? 
+    # e.g. "Type A Subtype B" -> "Type A" (if "Type A" exists)
+    type_mapping = {}
+    
+    for t_long in unique_types:
+        best_base = t_long
+        for t_short in unique_types:
+            # Must be strictly shorter
+            if len(t_short) < len(t_long):
+                # Must be a prefix
+                if t_long.startswith(t_short):
+                    # Must respect word boundary (next char is space)
+                    # t_long is longer, so t_long[len(t_short)] exists.
+                    char_after = t_long[len(t_short)]
+                    if char_after == ' ':
+                        # Found a valid prefix.
+                        # We want the Longest such prefix (most specific).
+                        # Since unique_types is sorted by length, we are iterating from short to long.
+                        # So this t_short is longer than previous ones? No, outer loop is t_long.
+                        # Inner loop: sorted by length. So we will see shorter ones first.
+                        # We want to keep updating best_base if we find a longer match.
+                        best_base = t_short
         
+        type_mapping[t_long] = best_base
+
+    # 3. Apply mapping
+    for p in processes:
+        p['tipo_solicitacao'] = type_mapping.get(p['tipo_solicitacao'], p['tipo_solicitacao'])
+        
+        # Hardcoded corrections for cut-off types (based on user feedback)
+        t = p['tipo_solicitacao']
+        if t in ['CREDITO TRIBUTARIO - RES', 'CREDITO TRIBUTARIO - RE']:
+            p['tipo_solicitacao'] = 'CREDITO TRIBUTARIO - RESTITUICAO'
+        elif t in ['IMUNIDADE TRIBUTARIA - R', 'IMUNIDADE TRIBUTARIA - RE']:
+             p['tipo_solicitacao'] = 'IMUNIDADE TRIBUTARIA - RECONHECIMENTO' # Assumption based on pattern, can be adjusted
+        elif t == 'CANCELAMENTO DE NOTA F':
+             p['tipo_solicitacao'] = 'CANCELAMENTO DE NOTAS'
+
     return processes
 
 if __name__ == "__main__":
