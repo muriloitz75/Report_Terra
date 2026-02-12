@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,11 +7,12 @@ import shutil
 import os
 import io
 import pandas as pd
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 from .process_pdf import parse_pdf
 import tempfile
 import logging
+import traceback
 
 # Configure logging
 # Use INFO in production, DEBUG in development
@@ -47,6 +48,50 @@ app.add_middleware(
 # We will store the dataframe globally for this session
 DB = []
 
+# Global Upload State
+UPLOAD_STATE: Dict[str, Any] = {
+    "status": "idle", # idle, processing, completed, error
+    "message": "",
+    "processed_count": 0,
+    "error": None
+}
+
+def process_pdf_background(tmp_path: str):
+    """Background task to process PDF without blocking."""
+    global DB, UPLOAD_STATE
+    
+    logger.info(f"Starting background processing for {tmp_path}")
+    UPLOAD_STATE["status"] = "processing"
+    UPLOAD_STATE["message"] = "Processando arquivo PDF..."
+    UPLOAD_STATE["error"] = None
+    
+    try:
+        # This is the CPU bound part
+        data = parse_pdf(tmp_path)
+        
+        # Update DB
+        DB = data
+        
+        UPLOAD_STATE["status"] = "completed"
+        UPLOAD_STATE["processed_count"] = len(data)
+        UPLOAD_STATE["message"] = f"Sucesso! {len(data)} registros extraídos."
+        logger.info(f"Background processing completed. Extracted {len(data)} records.")
+        
+    except Exception as e:
+        logger.error(f"Error in background processing: {e}")
+        logger.error(traceback.format_exc())
+        UPLOAD_STATE["status"] = "error"
+        UPLOAD_STATE["error"] = str(e)
+        UPLOAD_STATE["message"] = "Erro ao processar arquivo."
+        
+    finally:
+        # Clean up temp file
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception as e:
+                logger.warning(f"Failed to remove temp file {tmp_path}: {e}")
+
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint - API está funcionando"""
@@ -56,24 +101,32 @@ async def health_check():
         "docs": "/docs"
     }
 
+@app.get("/upload/status")
+def get_upload_status():
+    """Get the current status of the PDF processing."""
+    return UPLOAD_STATE
+
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="File must be a PDF")
     
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        shutil.copyfileobj(file.file, tmp)
-        tmp_path = tmp.name
-    
+    # Reset state if not already processing (simple concurrency lock)
+    if UPLOAD_STATE["status"] == "processing":
+         raise HTTPException(status_code=409, detail="Já existe um arquivo sendo processado. Aguarde.")
+
+    # Save to temp file
     try:
-        data = parse_pdf(tmp_path)
-        global DB
-        DB = data # Replace current DB with new load
-        return {"message": "File processed successfully", "count": len(data)}
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = tmp.name
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        os.remove(tmp_path)
+        raise HTTPException(status_code=500, detail=f"Failed to save upload: {e}")
+    
+    # Start background task
+    background_tasks.add_task(process_pdf_background, tmp_path)
+    
+    return {"message": "Upload recebido. Processamento iniciado em segundo plano.", "status": "processing"}
 
 @app.delete("/clear")
 def clear_records():
@@ -424,8 +477,8 @@ def export_excel(
     worksheet.merge_range('A1:F1', 'Report Terra - Processos', title_fmt)
     export_time = datetime.now().strftime('%d/%m/%Y %H:%M')
     filters_desc = []
-    if month_filter:
-        filters_desc.append(f"Período: {month_filter}")
+    if start_date or end_date:
+        filters_desc.append(f"Período: {start_date or 'Início'} a {end_date or 'Fim'}")
     if status_filter:
         filters_desc.append(f"Situação: {status_filter}")
     if type_filter:

@@ -37,6 +37,18 @@ export interface PaginatedProcesses {
     pages: number;
 }
 
+export interface UploadStatus {
+    status: 'idle' | 'processing' | 'completed' | 'error';
+    message: string;
+    processed_count: number;
+    error?: string;
+}
+
+export const getUploadStatus = async (): Promise<UploadStatus> => {
+    const response = await axios.get(`${API_URL}/upload/status`);
+    return response.data;
+};
+
 export const uploadPDF = async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);

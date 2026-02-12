@@ -1,8 +1,8 @@
-﻿
+﻿﻿﻿﻿﻿﻿
 "use client"
 
 import { useState, useEffect } from 'react';
-import { uploadPDF, getStats, getProcesses, exportExcel, clearRecords, KPIStats, Process, PaginatedProcesses } from '@/lib/api';
+import { uploadPDF, getStats, getProcesses, exportExcel, clearRecords, KPIStats, Process, PaginatedProcesses, getUploadStatus } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [processes, setProcesses] = useState<PaginatedProcesses | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
 
   // Filters
   const [page, setPage] = useState(1);
@@ -58,16 +59,58 @@ export default function Dashboard() {
     if (!e.target.files?.[0]) return;
 
     setUploading(true);
+    setUploadMessage("Enviando arquivo...");
+    
     try {
+      // 1. Send File (Returns immediately with 200/202)
       await uploadPDF(e.target.files[0]);
-      // clear filters on new upload
-      setDateRange(undefined);
-      await loadData();
-      setDbLoaded(true);
-    } catch (error) {
-      alert("Erro ao enviar arquivo PDF");
-    } finally {
-      setUploading(false);
+      
+      // 2. Start Polling
+      setUploadMessage("Processando PDF (0%)...");
+      
+      const interval = setInterval(async () => {
+        try {
+          const status = await getUploadStatus();
+          
+          if (status.status === 'processing') {
+             // We can use status.processed_count if we had total, but here we just show message
+             setUploadMessage(status.message || "Processando...");
+          } else if (status.status === 'completed') {
+             clearInterval(interval);
+             setUploadMessage("Concluído!");
+             
+             // Refresh Data
+             setDateRange(undefined);
+             await loadData();
+             setDbLoaded(true);
+             
+             // Reset UI after short delay
+             setTimeout(() => {
+                 setUploading(false);
+                 setUploadMessage("");
+             }, 1000);
+          } else if (status.status === 'error') {
+             clearInterval(interval);
+             setUploading(false);
+             setUploadMessage("");
+             alert(`Erro no processamento: ${status.error}`);
+          }
+        } catch (err) {
+            console.error("Polling error", err);
+            // Don't stop polling on single network error, but maybe if persistent?
+            // For simplicity, we keep polling.
+        }
+      }, 1000); // Check every 1s
+
+    } catch (error: any) {
+        setUploading(false);
+        setUploadMessage("");
+        if (error.response?.status === 409) {
+            alert("Já existe um arquivo sendo processado. Por favor, aguarde.");
+        } else {
+            console.error(error);
+            alert("Erro ao enviar arquivo PDF");
+        }
     }
   };
 
@@ -148,7 +191,7 @@ export default function Dashboard() {
                   ) : (
                     <Upload className="w-4 h-4 mr-2" />
                   )}
-                  {uploading ? "Processando..." : "Upload PDF"}
+                  {uploading ? uploadMessage || "Processando..." : "Upload PDF"}
                 </span>
               </Button>
             </label>
