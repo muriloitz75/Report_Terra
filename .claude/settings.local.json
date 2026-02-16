@@ -16,7 +16,15 @@
       "Bash(powershell -Command \"Stop-Process -Name python -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Write-Output ''killed''\")",
       "Bash(powershell -Command \"Get-Process python* | Select-Object Id, Name, CommandLine | Format-List\")",
       "Bash(xxd:*)",
-      "Bash(powershell.exe -Command \"Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force\")"
+      "Bash(powershell.exe -Command \"Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force\")",
+      "Bash(ss:*)",
+      "Bash(taskkill:*)",
+      "Bash(cmd /c \"taskkill /F /PID 17648 & taskkill /F /PID 6056 & taskkill /F /PID 20476\")",
+      "Bash(cmd /c \"taskkill /F /PID 17648\")",
+      "Bash(cmd /c \"taskkill /F /PID 6056\")",
+      "Bash(cmd /c \"taskkill /F /PID 20476\")",
+      "Bash(powershell -Command:*)",
+      "Bash(/c/Users/Murilo/Desktop/Projects/Report_Terra/.venv/Scripts/python -m uvicorn:*)"
     ]
   }
 }
