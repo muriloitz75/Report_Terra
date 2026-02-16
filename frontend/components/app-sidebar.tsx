@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, TableProperties, FileText, Menu, X, LogOut, Shield } from "lucide-react";
+import { LayoutDashboard, TableProperties, FileText, Menu, X, LogOut, Shield, Power } from "lucide-react";
 import { useState } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
@@ -129,15 +129,26 @@ export function AppSidebar() {
                                 </div>
                             </div>
 
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className={`text-slate-500 hover:text-red-500 hover:bg-red-500/10 h-8 w-8 transition-opacity duration-300 ${!isHovered && "md:opacity-0 md:w-0 md:hidden"}`}
-                                onClick={handleShutdown}
-                                title="Encerrar Aplicação"
-                            >
-                                <LogOut className="w-4 h-4" />
-                            </Button>
+                            <div className={`flex items-center gap-1 transition-opacity duration-300 ${!isHovered && "md:opacity-0 md:w-0 md:hidden"}`}>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-slate-500 hover:text-amber-400 hover:bg-amber-400/10 h-8 w-8"
+                                    onClick={() => signOut({ callbackUrl: "/login" })}
+                                    title="Sair"
+                                >
+                                    <LogOut className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-slate-500 hover:text-red-500 hover:bg-red-500/10 h-8 w-8"
+                                    onClick={handleShutdown}
+                                    title="Encerrar Aplicação"
+                                >
+                                    <Power className="w-4 h-4" />
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 </div>
