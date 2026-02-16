@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { FileText, Bot, Loader2, Sparkles, Trash2, Wand2, Download, ThumbsUp, ThumbsDown } from 'lucide-react';
 
-export const dynamic = 'force-dynamic';
+
 
 function RelatoriosContent() {
     const { report, loading, generate, clearReport: contextClearReport } = useReport();
