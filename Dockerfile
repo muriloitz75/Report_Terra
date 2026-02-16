@@ -16,7 +16,7 @@ FROM node:22-alpine
 WORKDIR /app
 
 # Install Python for backend
-RUN apk add --no-cache python3 py3-pip build-base libffi-dev
+RUN apk add --no-cache python3 py3-pip build-base libffi-dev curl
 
 # Setup Backend dependencies
 COPY requirements.txt .
@@ -33,7 +33,7 @@ COPY --from=frontend_build /app/frontend/public ./frontend/standalone/public
 # Variáveis de Ambiente Padrão
 ENV LOG_LEVEL=INFO
 ENV NODE_ENV=production
-ENV BACKEND_API_URL=http://localhost:8000
+ENV BACKEND_API_URL=http://127.0.0.1:8000
 ENV AUTH_TRUST_HOST=true
 ENV AUTH_SECRET=your-secret-key-change-in-prod-or-generate-openssl-rand-base64-32
 
@@ -41,8 +41,9 @@ ENV AUTH_SECRET=your-secret-key-change-in-prod-or-generate-openssl-rand-base64-3
 RUN echo '#!/bin/sh' > /app/start.sh && \
     echo 'echo "Iniciando backend na porta 8000..."' >> /app/start.sh && \
     echo 'cd /app/backend && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 &' >> /app/start.sh && \
-    echo 'sleep 3' >> /app/start.sh && \
-    echo 'echo "Iniciando frontend na porta 3000..."' >> /app/start.sh && \
+    echo 'echo "Aguardando backend ficar pronto..."' >> /app/start.sh && \
+    echo 'until curl -sf http://127.0.0.1:8000/health > /dev/null 2>&1; do sleep 1; done' >> /app/start.sh && \
+    echo 'echo "Backend pronto! Iniciando frontend..."' >> /app/start.sh && \
     echo 'cd /app/frontend/standalone && node server.js' >> /app/start.sh && \
     chmod +x /app/start.sh
 
