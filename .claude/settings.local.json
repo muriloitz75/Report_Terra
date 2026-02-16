@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tasklist:*)",
+      "Bash(npm run dev:*)",
+      "Bash(netstat:*)",
+      "Bash(python -m uvicorn:*)",
+      "Bash(python -c:*)",
+      "Bash(python -m alembic:*)",
+      "Bash(/c/Users/Murilo/Desktop/Projects/Report_Terra/.venv/Scripts/alembic upgrade:*)",
+      "Bash(powershell -Command \"& python -c ''from alembic.config import Config; from alembic import command; cfg = Config\\(\"\"alembic.ini\"\"\\); command.upgrade\\(cfg, \"\"head\"\"\\)''\")",
+      "Bash(\"/c/Users/Murilo/Desktop/Projects/Report_Terra/.venv/Scripts/python.exe\" -c \"from alembic.config import Config; from alembic import command; cfg = Config\\(''alembic.ini''\\); command.upgrade\\(cfg, ''head''\\)\")",
+      "Bash(\"/c/Users/Murilo/Desktop/Projects/Report_Terra/.venv/Scripts/python.exe\" -c \"\nimport sqlite3\ndb_path = ''c:/Users/Murilo/Desktop/Projects/Report_Terra/backend/data/report_terra.db''\nconn = sqlite3.connect\\(db_path\\)\ncur = conn.cursor\\(\\)\n\n# Check existing columns\ncur.execute\\(''PRAGMA table_info\\(users\\)''\\)\ncols = [row[1] for row in cur.fetchall\\(\\)]\nprint\\(''Current columns:'', cols\\)\n\n# Add role column if not exists\nif ''role'' not in cols:\n    cur.execute\\(\"\"ALTER TABLE users ADD COLUMN role TEXT DEFAULT ''user''\"\"\\)\n    print\\(''Added: role''\\)\nelse:\n    print\\(''role already exists''\\)\n\n# Add can_generate_report column if not exists\nif ''can_generate_report'' not in cols:\n    cur.execute\\(''ALTER TABLE users ADD COLUMN can_generate_report INTEGER DEFAULT 0''\\)\n    print\\(''Added: can_generate_report''\\)\nelse:\n    print\\(''can_generate_report already exists''\\)\n\n# Update admin user\ncur.execute\\(\"\"UPDATE users SET role=''admin'', can_generate_report=1 WHERE email=''admin@reportterra.com''\"\"\\)\nprint\\(f''Updated admin: {cur.rowcount} row\\(s\\)''\\)\n\nconn.commit\\(\\)\nconn.close\\(\\)\nprint\\(''Done.''\\)\n\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbkByZXBvcnR0ZXJyYS5jb20iLCJpZCI6MSwicm9sZSI6ImFkbWluIiwiY2FuX2dlbmVyYXRlX3JlcG9ydCI6dHJ1ZSwiZXhwIjoxNzcxMzUyNjYxfQ.gacoF6sEL0Yrty7p4hozpOTB3A-qHQZBcHaGxAkL7Fo\")",
+      "Bash(\"/c/Users/Murilo/Desktop/Projects/Report_Terra/.venv/Scripts/python\" -c \"import sys; sys.path.insert\\(0, ''c:/Users/Murilo/Desktop/Projects/Report_Terra/backend''\\); import main; print\\(''OK''\\)\")",
+      "Bash(powershell -Command \"Stop-Process -Name python -Force -ErrorAction SilentlyContinue; Start-Sleep 1; Write-Output ''killed''\")",
+      "Bash(powershell -Command \"Get-Process python* | Select-Object Id, Name, CommandLine | Format-List\")",
+      "Bash(xxd:*)",
+      "Bash(powershell.exe -Command \"Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force\")"
+    ]
+  }
+}

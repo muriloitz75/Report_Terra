@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Static export for Docker/Railway (Python backend serves files)
-  // Static export removed for NextAuth support
-  // output: 'export',
+  // Standalone output for Docker deployment with NextAuth support
+  output: 'standalone',
 
   // Enable compression
   compress: true,
@@ -13,9 +12,56 @@ const nextConfig: NextConfig = {
 
   // Image optimization
   images: {
-    unoptimized: true, // Required for static export
+    unoptimized: true, // Required for standalone deployment
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 60,
+  },
+
+  // Proxy para a API do backend
+  async rewrites() {
+    const apiUrl = process.env.BACKEND_API_URL || 'http://localhost:8000';
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${apiUrl}/api/:path*`,
+      },
+      {
+        source: '/token',
+        destination: `${apiUrl}/token`,
+      },
+      {
+        source: '/auth/:path*',
+        destination: `${apiUrl}/auth/:path*`,
+      },
+      {
+        source: '/admin/:path*',
+        destination: `${apiUrl}/admin/:path*`,
+      },
+      {
+        source: '/stats',
+        destination: `${apiUrl}/stats`,
+      },
+      {
+        source: '/processes',
+        destination: `${apiUrl}/processes`,
+      },
+      {
+        source: '/upload/:path*',
+        destination: `${apiUrl}/upload/:path*`,
+      },
+      {
+        source: '/clear',
+        destination: `${apiUrl}/clear`,
+      },
+      {
+        source: '/export-excel',
+        destination: `${apiUrl}/export-excel`,
+      },
+      {
+        source: '/health',
+        destination: `${apiUrl}/health`,
+      },
+    ];
   },
 };
 

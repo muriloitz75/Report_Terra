@@ -10,12 +10,13 @@ import io
 import pandas as pd
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
-from .process_pdf import parse_pdf
+from process_pdf import parse_pdf
 import tempfile
 import logging
 import traceback
 import json
 import time
+from datetime import timedelta
 
 # Load .env from backend/ directory
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
@@ -52,56 +53,114 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory storage with Multi-tenancy support
-# DB is now a Dict where key is user_id and value is List of records
-DB: Dict[str, List[Dict[str, Any]]] = {}
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
+from database import get_db, engine
+from models import Base, User
+import auth
 
-# Persistence Configuration
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-DB_FILE = os.path.join(DATA_DIR, "db_persistence.json")
+# Create tables (if not using alembic, but we are, so this is backup/safe)
+Base.metadata.create_all(bind=engine)
 
-def load_db():
-    """Load database from JSON file."""
-    global DB
-    if os.path.exists(DB_FILE):
-        try:
-            with open(DB_FILE, "r", encoding="utf-8") as f:
-                DB = json.load(f)
-            logger.info(f"Database loaded from {DB_FILE}. Users found: {list(DB.keys())}")
-        except Exception as e:
-            logger.error(f"Failed to load database: {e}")
-            DB = {}
-    else:
-        logger.info("No existing database file found. Starting fresh.")
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "version": "1.0.0"}
 
-def save_db():
-    """Save database to JSON file."""
-    global DB
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    """
+    Validate JWT token and return current user.
+    """
     try:
-        os.makedirs(DATA_DIR, exist_ok=True)
-        with open(DB_FILE, "w", encoding="utf-8") as f:
-            json.dump(DB, f, indent=2, ensure_ascii=False)
-        logger.info(f"Database saved to {DB_FILE}")
+        payload = auth.decode_access_token(token)
+        if payload is None:
+            logger.warning("Token validation failed: decode_access_token returned None")
+            raise HTTPException(
+                status_code=401,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        email: str = payload.get("sub")
+        if email is None:
+            logger.warning("Token validation failed: Missing email (sub) in payload")
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+            
+        user = db.query(User).filter(User.email == email).first()
+        if user is None:
+            logger.warning(f"Token validation failed: User {email} not found in DB")
+            raise HTTPException(status_code=401, detail="User not found")
+            
+        return user
     except Exception as e:
-        logger.error(f"Failed to save database: {e}")
+        logger.error(f"Unexpected error in get_current_user: {e}")
+        raise
 
-# Security Scheme - Removed for Local Mode
-# security = HTTPBearer()
+def get_admin_user(current_user: User = Depends(get_current_user)):
+    """Require admin role."""
+    if getattr(current_user, 'role', 'user') != "admin":
+        raise HTTPException(status_code=403, detail="Acesso restrito a administradores")
+    return current_user
 
-def get_current_user() -> str:
-    """
-    Returns a default user ID for single-user mode.
-    Authentication has been disabled.
-    """
-    return "default_user"
+# Auth Routes
+@app.post("/token")
+@app.post("/token")
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    print(f"--- LOGIN ATTEMPT ---")
+    print(f"Username received: '{form_data.username}'")
+    
+    user = db.query(User).filter(User.email == form_data.username).first()
+    if not user:
+        print(f"User not found in DB.")
+    else:
+        print(f"User found: ID {user.id}, Hash: {user.hashed_password[:10]}...")
+        is_valid = auth.verify_password(form_data.password, user.hashed_password)
+        print(f"Password verification result: {is_valid}")
+        
+    if not user or not auth.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = auth.create_access_token(
+        data={
+            "sub": user.email,
+            "id": user.id,
+            "role": getattr(user, 'role', 'user'),
+            "can_generate_report": getattr(user, 'can_generate_report', False),
+        },
+        expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
-@app.on_event("startup")
-async def startup_event():
-    load_db()
+from pydantic import EmailStr
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    save_db()
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: Optional[str] = None
+
+@app.post("/auth/register")
+def register_user(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.email == user.email).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed_password = auth.get_password_hash(user.password)
+    new_user = User(email=user.email, hashed_password=hashed_password, full_name=user.full_name)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {"id": new_user.id, "email": new_user.email, "message": "User created successfully"}
+
+# In-memory DB fallback for legacy code (will be removed later)
+# DB: Dict[str, List[Dict[str, Any]]] = {}
+
+
+# Legacy startup/shutdown removed
+# Data persistence is now handled by SQL/SQLite
 
 # Global Upload State - Per User?
 # For simplicity, we keep it global but we could make it per-user too.
@@ -117,13 +176,17 @@ def get_user_upload_state(user_id: str):
         "error": None
     })
 
-def process_pdf_background(tmp_path: str, user_id: str):
+def process_pdf_background(tmp_path: str, user_id: int):
     """Background task to process PDF without blocking."""
-    global DB, UPLOAD_STATE
+    global UPLOAD_STATE
     
     logger.info(f"Starting background processing for {tmp_path} (User: {user_id})")
     
-    user_state = get_user_upload_state(user_id)
+    # We need to manually create a session here since we are in a background thread
+    from database import SessionLocal
+    db = SessionLocal()
+    
+    user_state = get_user_upload_state(str(user_id))
     user_state["status"] = "processing"
     user_state["message"] = "Processando arquivo PDF..."
     user_state["error"] = None
@@ -132,14 +195,45 @@ def process_pdf_background(tmp_path: str, user_id: str):
         # This is the CPU bound part
         data = parse_pdf(tmp_path)
         
-        # Update DB for specific user
-        if user_id not in DB:
-            DB[user_id] = []
+        # Save to SQL Database
+        from models import Process
+        from datetime import datetime
+
+        for item in data:
+            # Check if process already exists to avoid duplicates (optional, based on ID)
+            # For now, we will upsert or just insert. ID is primary key.
+            existing = db.query(Process).filter(Process.id == item['id']).first()
+            
+            if existing:
+                 # Update existing fields
+                 existing.contribuinte = item['contribuinte']
+                 existing.data_abertura = item['data_abertura']
+                 existing.ano = item['ano']
+                 existing.status = item['status']
+                 existing.setor_atual = item['setor_atual']
+                 existing.tipo_solicitacao = item['tipo_solicitacao']
+                 existing.dias_atraso_pdf = item['dias_atraso_pdf']
+                 existing.dias_atraso_calc = item['dias_atraso_calc']
+                 existing.is_atrasado = item['is_atrasado']
+                 existing.updated_at = datetime.utcnow()
+            else:
+                # Create new
+                new_process = Process(
+                    id=item['id'],
+                    user_id=user_id,
+                    contribuinte=item['contribuinte'],
+                    data_abertura=item['data_abertura'],
+                    ano=item['ano'],
+                    status=item['status'],
+                    setor_atual=item['setor_atual'],
+                    tipo_solicitacao=item['tipo_solicitacao'],
+                    dias_atraso_pdf=item['dias_atraso_pdf'],
+                    dias_atraso_calc=item['dias_atraso_calc'],
+                    is_atrasado=item['is_atrasado']
+                )
+                db.add(new_process)
         
-        DB[user_id].extend(data)
-        
-        # Persist changes
-        save_db()
+        db.commit()
         
         user_state["status"] = "completed"
         user_state["processed_count"] = len(data)
@@ -154,6 +248,7 @@ def process_pdf_background(tmp_path: str, user_id: str):
         user_state["message"] = "Erro ao processar arquivo."
         
     finally:
+        db.close()
         # Clean up temp file
         if os.path.exists(tmp_path):
             try:
@@ -171,20 +266,20 @@ async def health_check():
     }
 
 @app.get("/upload/status")
-def get_upload_status(user_id: str = Depends(get_current_user)):
+def get_upload_status(user: User = Depends(get_current_user)):
     """Get the current status of the PDF processing for the authenticated user."""
-    return get_user_upload_state(user_id)
+    return get_user_upload_state(str(user.id))
 
 @app.post("/upload")
 async def upload_file(
     background_tasks: BackgroundTasks, 
     file: UploadFile = File(...),
-    user_id: str = Depends(get_current_user)
+    user: User = Depends(get_current_user)
 ):
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="File must be a PDF")
     
-    user_state = get_user_upload_state(user_id)
+    user_state = get_user_upload_state(str(user.id))
 
     # Reset state if not already processing (simple concurrency lock per user)
     if user_state["status"] == "processing":
@@ -199,26 +294,27 @@ async def upload_file(
         raise HTTPException(status_code=500, detail=f"Failed to save upload: {e}")
     
     # Start background task
-    background_tasks.add_task(process_pdf_background, tmp_path, user_id)
+    background_tasks.add_task(process_pdf_background, tmp_path, user.id)
     
     return {"message": "Upload recebido. Processamento iniciado em segundo plano.", "status": "processing"}
 
 @app.delete("/clear")
-def clear_records(user_id: str = Depends(get_current_user)):
-    """Clear all in-memory process records for the authenticated user."""
-    global DB
+def clear_records(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Clear all process records for the authenticated user."""
+    from models import Process
     
-    user_data = DB.get(user_id, [])
-    count = len(user_data)
-    
-    DB[user_id] = [] # Clear only this user's data
-    save_db() # Persist changes
+    try:
+        deleted_count = db.query(Process).filter(Process.user_id == user.id).delete()
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to clear records: {e}")
     
     # Also reset status
-    if user_id in UPLOAD_STATE:
-        del UPLOAD_STATE[user_id]
+    if str(user.id) in UPLOAD_STATE:
+        del UPLOAD_STATE[str(user.id)]
         
-    return {"message": f"{count} registros removidos com sucesso.", "cleared": count}
+    return {"message": f"{deleted_count} registros removidos com sucesso.", "cleared": deleted_count}
 
 @app.get("/stats")
 def get_stats(
@@ -228,18 +324,26 @@ def get_stats(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     only_delayed: bool = False,
-    user_id: str = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
-        user_data = DB.get(user_id, [])
-        if not user_data:
+        from models import Process
+        # Optimized: Fetch directly from DB instead of loading all valid users
+        # For complexity analysis, we can use Pandas for aggregation or SQLAlchemy
+        # Given we have existing Pandas logic, let's load user data into DF
+        
+        query = db.query(Process).filter(Process.user_id == user.id)
+        
+        # Read from SQL to Pandas
+        df = pd.read_sql(query.statement, db.bind)
+        
+        if df.empty:
             return {
                 "total": 0, "encerrados": 0, "andamento": 0, "atrasados": 0,
                 "by_month": [], "by_type": [], 
                 "all_statuses": [], "all_types": [], "available_months": []
             }
-        
-        df = pd.DataFrame(user_data)
         
         # Normalize Request Type to avoid duplicates (e.g. "Tipo A" vs "Tipo A ")
         if 'tipo_solicitacao' in df.columns:
@@ -357,14 +461,18 @@ def get_processes(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     only_delayed: bool = False,
-    user_id: str = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    user_data = DB.get(user_id, [])
-    if not user_data:
+    from models import Process
+    
+    # Query Database
+    query = db.query(Process).filter(Process.user_id == user.id)
+    df = pd.read_sql(query.statement, db.bind)
+
+    if df.empty:
         return {"data": [], "total": 0, "page": page, "pages": 0}
         
-    df = pd.DataFrame(user_data)
-    
     # Normalize Request Type to avoid duplicates (e.g. "Tipo A" vs "Tipo A ")
     if 'tipo_solicitacao' in df.columns:
         df['tipo_solicitacao'] = df['tipo_solicitacao'].astype(str).str.strip().str.replace(r'\s+', ' ', regex=True)
@@ -441,16 +549,20 @@ def export_excel(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     only_delayed: bool = False,
-    user_id: str = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Export filtered processes to a formatted Excel file."""
     import xlsxwriter
     from datetime import datetime
+    from models import Process
 
-    if not DB.get(user_id):
+    # Query Database
+    query = db.query(Process).filter(Process.user_id == user.id)
+    df = pd.read_sql(query.statement, db.bind)
+
+    if df.empty:
         raise HTTPException(status_code=400, detail="Nenhum dado disponível para exportar.")
-
-    df = pd.DataFrame(DB[user_id])
 
     # Normalize Request Type to avoid duplicates (e.g. "Tipo A" vs "Tipo A ")
     if 'tipo_solicitacao' in df.columns:
@@ -639,6 +751,86 @@ def export_excel(
         headers={'Content-Disposition': f'attachment; filename="{filename}"'}
     )
 
+# --- ADMIN ENDPOINTS ---
+
+class UserUpdate(BaseModel):
+    role: Optional[str] = None
+    can_generate_report: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+class AdminUserCreate(BaseModel):
+    email: str
+    password: str
+    full_name: Optional[str] = None
+    role: str = "user"
+    can_generate_report: bool = False
+
+@app.get("/admin/users")
+def admin_list_users(admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    users = db.query(User).all()
+    return [
+        {
+            "id": u.id,
+            "email": u.email,
+            "full_name": u.full_name,
+            "role": getattr(u, 'role', 'user'),
+            "can_generate_report": bool(getattr(u, 'can_generate_report', False)),
+            "is_active": u.is_active,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+        }
+        for u in users
+    ]
+
+@app.patch("/admin/users/{user_id}")
+def admin_update_user(user_id: int, update: UserUpdate, admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    if update.role is not None:
+        user.role = update.role
+    if update.can_generate_report is not None:
+        user.can_generate_report = update.can_generate_report
+    if update.is_active is not None:
+        user.is_active = update.is_active
+    db.commit()
+    db.refresh(user)
+    return {
+        "id": user.id,
+        "email": user.email,
+        "role": getattr(user, 'role', 'user'),
+        "can_generate_report": bool(getattr(user, 'can_generate_report', False)),
+        "is_active": user.is_active,
+    }
+
+@app.post("/admin/users")
+def admin_create_user(user_data: AdminUserCreate, admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.email == user_data.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Email já cadastrado")
+    hashed_password = auth.get_password_hash(user_data.password)
+    new_user = User(
+        email=user_data.email,
+        hashed_password=hashed_password,
+        full_name=user_data.full_name,
+        role=user_data.role,
+        can_generate_report=user_data.can_generate_report,
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {"id": new_user.id, "email": new_user.email, "role": new_user.role, "can_generate_report": new_user.can_generate_report}
+
+@app.delete("/admin/users/{user_id}")
+def admin_deactivate_user(user_id: int, admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    if user.id == admin.id:
+        raise HTTPException(status_code=400, detail="Não é possível desativar seu próprio usuário")
+    user.is_active = False
+    db.commit()
+    return {"message": f"Usuário {user.email} desativado"}
+
 # Mount static files (Frontend)
 # Only mount if directory exists (in production or after local build)
 # Mount static files (Frontend)
@@ -660,8 +852,11 @@ async def serve_spa_root():
 @app.get("/{full_path:path}")
 async def serve_react_app(full_path: str):
     """Serve the React app for any other route"""
-    # API routes are prioritized (defined above)
-    
+    # Don't serve HTML for API/admin paths — return 404 JSON instead
+    clean = full_path.strip('/')
+    if clean.startswith('admin') or clean.startswith('api/') or clean == 'api':
+        raise HTTPException(status_code=404, detail=f"Route /{full_path} not found")
+
     # Check if file exists in frontend/out
     file_path = os.path.join(static_dir, full_path)
     if os.path.exists(file_path) and os.path.isfile(file_path):
@@ -674,7 +869,7 @@ async def serve_react_app(full_path: str):
         
     return {"message": "Frontend not built or not found (run 'npm run build' in frontend/)"}
 
-from .ai_agent import generate_analysis_stream
+from ai_agent import generate_analysis_stream
 
 @app.post("/api/generate-report")
 async def generate_report(
@@ -685,20 +880,28 @@ async def generate_report(
     end_date: Optional[str] = None,
     only_delayed: bool = False,
     user_prompt: Optional[str] = None,
-    user_id: str = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Generates an AI report based on the filtered data.
     Streams the response in Markdown format.
     """
-    user_data = DB.get(user_id, [])
-    if not user_data:
+    # Check permission: admin always can; others need can_generate_report=True
+    user_role = getattr(user, 'role', 'user')
+    user_can = getattr(user, 'can_generate_report', False)
+    if user_role != "admin" and not user_can:
+        raise HTTPException(status_code=403, detail="Permissão negada. Contate o administrador para liberar acesso aos relatórios de IA.")
+
+    from models import Process
+    query = db.query(Process).filter(Process.user_id == user.id)
+    df = pd.read_sql(query.statement, db.bind)
+
+    if df.empty:
         # Stream a message saying no data
         async def no_data_gen():
             yield "Não há dados disponíveis para análise."
         return StreamingResponse(no_data_gen(), media_type="text/markdown")
-
-    df = pd.DataFrame(user_data)
 
     # --- Filtering Logic (Same as other endpoints) ---
     

@@ -2,9 +2,9 @@
 import axios from 'axios';
 import { getSession } from 'next-auth/react';
 
-// In production (unified deploy), use relative URL (empty string = same origin).
-// In development, set NEXT_PUBLIC_API_URL or rely on default
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Use URLs relativas - o Next.js fará o proxy para o backend via rewrites
+// Em desenvolvimento, o proxy do Next.js encaminha para localhost:8000
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 const api = axios.create({
     baseURL: API_URL

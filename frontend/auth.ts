@@ -11,6 +11,18 @@ function decodeJWTPayload(token: string): Record<string, any> {
     }
 }
 
+// URL do backend para uso no servidor (NextAuth roda no servidor)
+// Em produção Docker, o backend está em localhost:8000
+// Em desenvolvimento, usa NEXT_PUBLIC_API_URL ou localhost:8000
+const getBackendUrl = () => {
+    if (typeof window !== 'undefined') {
+        // No cliente, usa URL relativa (proxy via Next.js rewrites)
+        return '';
+    }
+    // No servidor, usa a URL direta do backend
+    return process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+};
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
     providers: [
         Credentials({
@@ -20,7 +32,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             },
             authorize: async (credentials) => {
                 try {
-                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/token`, {
+                    const backendUrl = getBackendUrl();
+                    const res = await fetch(`${backendUrl}/token`, {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/x-www-form-urlencoded",
