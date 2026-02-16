@@ -35,6 +35,8 @@ ENV PORT=8000
 ENV LOG_LEVEL=INFO
 ENV NODE_ENV=production
 ENV BACKEND_API_URL=http://localhost:8000
+ENV AUTH_TRUST_HOST=true
+ENV AUTH_SECRET=your-secret-key-change-in-prod-or-generate-openssl-rand-base64-32
 
 # Criar script de inicialização que inicia ambos os serviços
 RUN echo '#!/bin/sh' > /app/start.sh && \
