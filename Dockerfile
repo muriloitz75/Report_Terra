@@ -31,7 +31,6 @@ COPY --from=frontend_build /app/frontend/.next/static ./frontend/standalone/.nex
 COPY --from=frontend_build /app/frontend/public ./frontend/standalone/public
 
 # Variáveis de Ambiente Padrão
-ENV PORT=8000
 ENV LOG_LEVEL=INFO
 ENV NODE_ENV=production
 ENV BACKEND_API_URL=http://localhost:8000
@@ -44,7 +43,7 @@ RUN echo '#!/bin/sh' > /app/start.sh && \
     echo 'cd /app/backend && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 &' >> /app/start.sh && \
     echo 'sleep 3' >> /app/start.sh && \
     echo 'echo "Iniciando frontend na porta 3000..."' >> /app/start.sh && \
-    echo 'cd /app/frontend/standalone && PORT=3000 node server.js' >> /app/start.sh && \
+    echo 'cd /app/frontend/standalone && node server.js' >> /app/start.sh && \
     chmod +x /app/start.sh
 
 # Expor porta do frontend (principal)
