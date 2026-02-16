@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
 
   // Proxy para a API do backend
   async rewrites() {
-    const apiUrl = process.env.BACKEND_API_URL || 'http://localhost:8000';
+    const apiUrl = process.env.BACKEND_API_URL || 'http://127.0.0.1:8000';
     return [
       {
         source: '/api/generate-report',
