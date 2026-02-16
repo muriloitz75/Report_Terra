@@ -4,9 +4,16 @@ pandas==2.2.3
 pdfplumber==0.11.4
 python-multipart==0.0.12
 xlsxwriter==3.2.0
-langchain==0.1.12
-langchain-openai==0.0.8
-langchain-community==0.0.28
+
+# LangChain ecosystem - versões atualizadas e compatíveis
+langchain>=0.3.14
+langchain-openai>=0.2.14
+langchain-community>=0.3.14
+langchain-core>=0.3.29
+langchain-anthropic>=0.3.1
+langchain-google-genai>=2.0.1
+langchain-huggingface>=0.1.2
+
 python-jose[cryptography]
 passlib[bcrypt]
 pydantic[email]
@@ -16,8 +23,3 @@ gunicorn==21.2.0
 python-dotenv==1.0.0
 aiofiles
 requests
-
-# Multi-LLM Support
-langchain-anthropic
-langchain-google-genai
-langchain-huggingface

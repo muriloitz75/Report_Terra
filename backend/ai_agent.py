@@ -115,7 +115,7 @@ def get_llm_model():
         api_key = os.getenv("HUGGINGFACEHUB_API_TOKEN")
         if not api_key:
              raise ValueError("Chave HUGGINGFACEHUB_API_TOKEN não configurada.")
-        # Using Flan-T5 Large which is reliable on free tier for text generation
+        # Using Hugging Face Inference API with repo_id parameter
         return HuggingFaceEndpoint(
             repo_id="google/flan-t5-large",
             max_new_tokens=1024,
