@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Static export for Unified Deployment
-  output: 'export',
+  // Standalone output for Docker/Railway
+  output: 'standalone',
 
   // Enable compression
   compress: true,

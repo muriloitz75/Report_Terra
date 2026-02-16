@@ -1,7 +1,8 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 import uvicorn
 import shutil
 import os
@@ -13,6 +14,13 @@ from .process_pdf import parse_pdf
 import tempfile
 import logging
 import traceback
+import json
+import time
+
+# Load .env from backend/ directory
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+
+
 
 # Configure logging
 # Use INFO in production, DEBUG in development
@@ -44,45 +52,66 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory storage for simplicity (could be SQLite in future)
-# We will store the dataframe globally for this session
-DB = []
+# In-memory storage with Multi-tenancy support
+# DB is now a Dict where key is user_id and value is List of records
+DB: Dict[str, List[Dict[str, Any]]] = {}
 
-# Global Upload State
-UPLOAD_STATE: Dict[str, Any] = {
-    "status": "idle", # idle, processing, completed, error
-    "message": "",
-    "processed_count": 0,
-    "error": None
-}
+# Security Scheme - Removed for Local Mode
+# security = HTTPBearer()
 
-def process_pdf_background(tmp_path: str):
+def get_current_user() -> str:
+    """
+    Returns a default user ID for single-user mode.
+    Authentication has been disabled.
+    """
+    return "default_user"
+
+# Global Upload State - Per User?
+# For simplicity, we keep it global but we could make it per-user too.
+# If multiple users upload simultaneously, this might be race-y for status updates.
+# refactoring to Dict[user_id, status]
+UPLOAD_STATE: Dict[str, Dict[str, Any]] = {}
+
+def get_user_upload_state(user_id: str):
+    return UPLOAD_STATE.setdefault(user_id, {
+        "status": "idle",
+        "message": "",
+        "processed_count": 0,
+        "error": None
+    })
+
+def process_pdf_background(tmp_path: str, user_id: str):
     """Background task to process PDF without blocking."""
     global DB, UPLOAD_STATE
     
-    logger.info(f"Starting background processing for {tmp_path}")
-    UPLOAD_STATE["status"] = "processing"
-    UPLOAD_STATE["message"] = "Processando arquivo PDF..."
-    UPLOAD_STATE["error"] = None
+    logger.info(f"Starting background processing for {tmp_path} (User: {user_id})")
+    
+    user_state = get_user_upload_state(user_id)
+    user_state["status"] = "processing"
+    user_state["message"] = "Processando arquivo PDF..."
+    user_state["error"] = None
     
     try:
         # This is the CPU bound part
         data = parse_pdf(tmp_path)
         
-        # Update DB
-        DB = data
+        # Update DB for specific user
+        if user_id not in DB:
+            DB[user_id] = []
         
-        UPLOAD_STATE["status"] = "completed"
-        UPLOAD_STATE["processed_count"] = len(data)
-        UPLOAD_STATE["message"] = f"Sucesso! {len(data)} registros extraídos."
-        logger.info(f"Background processing completed. Extracted {len(data)} records.")
+        DB[user_id].extend(data)
+        
+        user_state["status"] = "completed"
+        user_state["processed_count"] = len(data)
+        user_state["message"] = f"Sucesso! {len(data)} registros extraídos."
+        logger.info(f"Background processing completed for {user_id}. Extracted {len(data)} records.")
         
     except Exception as e:
         logger.error(f"Error in background processing: {e}")
         logger.error(traceback.format_exc())
-        UPLOAD_STATE["status"] = "error"
-        UPLOAD_STATE["error"] = str(e)
-        UPLOAD_STATE["message"] = "Erro ao processar arquivo."
+        user_state["status"] = "error"
+        user_state["error"] = str(e)
+        user_state["message"] = "Erro ao processar arquivo."
         
     finally:
         # Clean up temp file
@@ -102,17 +131,23 @@ async def health_check():
     }
 
 @app.get("/upload/status")
-def get_upload_status():
-    """Get the current status of the PDF processing."""
-    return UPLOAD_STATE
+def get_upload_status(user_id: str = Depends(get_current_user)):
+    """Get the current status of the PDF processing for the authenticated user."""
+    return get_user_upload_state(user_id)
 
 @app.post("/upload")
-async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def upload_file(
+    background_tasks: BackgroundTasks, 
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user)
+):
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="File must be a PDF")
     
-    # Reset state if not already processing (simple concurrency lock)
-    if UPLOAD_STATE["status"] == "processing":
+    user_state = get_user_upload_state(user_id)
+
+    # Reset state if not already processing (simple concurrency lock per user)
+    if user_state["status"] == "processing":
          raise HTTPException(status_code=409, detail="Já existe um arquivo sendo processado. Aguarde.")
 
     # Save to temp file
@@ -124,16 +159,24 @@ async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File
         raise HTTPException(status_code=500, detail=f"Failed to save upload: {e}")
     
     # Start background task
-    background_tasks.add_task(process_pdf_background, tmp_path)
+    background_tasks.add_task(process_pdf_background, tmp_path, user_id)
     
     return {"message": "Upload recebido. Processamento iniciado em segundo plano.", "status": "processing"}
 
 @app.delete("/clear")
-def clear_records():
-    """Clear all in-memory process records."""
+def clear_records(user_id: str = Depends(get_current_user)):
+    """Clear all in-memory process records for the authenticated user."""
     global DB
-    count = len(DB)
-    DB = []
+    
+    user_data = DB.get(user_id, [])
+    count = len(user_data)
+    
+    DB[user_id] = [] # Clear only this user's data
+    
+    # Also reset status
+    if user_id in UPLOAD_STATE:
+        del UPLOAD_STATE[user_id]
+        
     return {"message": f"{count} registros removidos com sucesso.", "cleared": count}
 
 @app.get("/stats")
@@ -143,111 +186,123 @@ def get_stats(
     status_filter: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    only_delayed: bool = False
+    only_delayed: bool = False,
+    user_id: str = Depends(get_current_user)
 ):
-    if not DB:
-        return {
-            "total": 0, "encerrados": 0, "andamento": 0, "atrasados": 0,
-            "by_month": [], "by_type": [], 
-            "all_statuses": [], "all_types": [], "available_months": []
-        }
-    
-    df = pd.DataFrame(DB)
-    
-    # Normalize Request Type to avoid duplicates (e.g. "Tipo A" vs "Tipo A ")
-    if 'tipo_solicitacao' in df.columns:
-        df['tipo_solicitacao'] = df['tipo_solicitacao'].astype(str).str.strip().str.replace(r'\s+', ' ', regex=True)
-
-    # Pre-process dates if needed
-    if 'data_abertura' in df.columns and not df['data_abertura'].eq("").all():
-        df['dt'] = pd.to_datetime(df['data_abertura'], format='%d/%m/%Y', errors='coerce')
-        df['month_year'] = df['dt'].dt.strftime('%Y-%m')
-
-    # 1. Calculate Options (from Unfiltered Data)
-    all_statuses = sorted(df['status'].dropna().unique().tolist()) if 'status' in df.columns else []
-    all_types = sorted(df['tipo_solicitacao'].dropna().unique().tolist()) if 'tipo_solicitacao' in df.columns else []
-    available_months = sorted(df['month_year'].dropna().unique().tolist()) if 'month_year' in df.columns else []
-
-    # 2. Apply Filters
-    # Search
-    if search:
-        search_lower = search.lower()
-        df = df[
-            df['id'].astype(str).str.contains(search_lower, case=False) |
-            df['contribuinte'].astype(str).str.contains(search_lower, case=False) |
-            df['tipo_solicitacao'].astype(str).str.contains(search_lower, case=False)
-        ]
-
-    # Type Filter
-    if type_filter:
-        types = type_filter.split(',')
+    try:
+        user_data = DB.get(user_id, [])
+        if not user_data:
+            return {
+                "total": 0, "encerrados": 0, "andamento": 0, "atrasados": 0,
+                "by_month": [], "by_type": [], 
+                "all_statuses": [], "all_types": [], "available_months": []
+            }
+        
+        df = pd.DataFrame(user_data)
+        
+        # Normalize Request Type to avoid duplicates (e.g. "Tipo A" vs "Tipo A ")
         if 'tipo_solicitacao' in df.columns:
-            df = df[df['tipo_solicitacao'].isin(types)]
-            
-    # Status Filter
-    if status_filter:
-        statuses = status_filter.split(',')
-        if 'status' in df.columns:
-            df = df[df['status'].isin(statuses)]
+            df['tipo_solicitacao'] = df['tipo_solicitacao'].astype(str).str.strip().str.replace(r'\s+', ' ', regex=True)
 
-    # Date Range Filter
-    if start_date:
-        if 'dt' in df.columns:
-            df = df[df['dt'] >= pd.to_datetime(start_date)]
-    if end_date:
-        if 'dt' in df.columns:
-            # Add time to include the end date fully if using datetime comparison
-            # But pd.to_datetime('2024-01-01') is 00:00:00.
-            # If df['dt'] matches matches 00:00:00 (which it does via format), it works.
-            df = df[df['dt'] <= pd.to_datetime(end_date)]
+        # Pre-process dates if needed
+        if 'data_abertura' in df.columns and not df['data_abertura'].eq("").all():
+            df['dt'] = pd.to_datetime(df['data_abertura'], format='%d/%m/%Y', errors='coerce')
+            df['month_year'] = df['dt'].dt.strftime('%Y-%m')
 
-    # Only Delayed
-    if only_delayed:
-        if 'is_atrasado' in df.columns:
-            df = df[df['is_atrasado'] == True]
+        # 1. Calculate Options (from Unfiltered Data)
+        all_statuses = sorted(df['status'].dropna().unique().tolist()) if 'status' in df.columns else []
+        all_types = sorted(df['tipo_solicitacao'].dropna().unique().tolist()) if 'tipo_solicitacao' in df.columns else []
+        available_months = sorted(df['month_year'].dropna().unique().tolist()) if 'month_year' in df.columns else []
 
-    # 3. Calculate KPIs (from Filtered Data)
-    total = len(df)
-    
-    # Encerrados logic: includes "ENCERRAMENTO", "DEFERIDO", "INDEFERIDO"
-    # Case insensitive just in case
-    encerrados_mask = df['status'].str.contains('ENCERRAMENTO|DEFERIDO|INDEFERIDO', na=False, case=False) if 'status' in df.columns else pd.Series([False] * len(df))
-    encerrados_count = len(df[encerrados_mask]) if not df.empty else 0
-    
-    andamento_count = len(df[df['status'] == 'ANDAMENTO']) if not df.empty and 'status' in df.columns else 0
-    atrasados_count = len(df[df['is_atrasado'] == True]) if not df.empty and 'is_atrasado' in df.columns else 0
-    
-    # 4. Calculate Charts (from Filtered Data)
-    
-    # Evolution by Month
-    evolution_data = []
-    if not df.empty and 'month_year' in df.columns:
-         evolution = df.groupby('month_year').agg(
-            total=('id', 'count'),
-            encerrados=('status', lambda x: x.str.contains('ENCERRAMENTO|DEFERIDO|INDEFERIDO', na=False, case=False).sum()),
-            andamento=('status', lambda x: (x == 'ANDAMENTO').sum()),
-            atrasados=('is_atrasado', 'sum')
-        ).reset_index().sort_values('month_year')
-         evolution_data = evolution.to_dict('records')
+        # 2. Apply Filters
+        # Search
+        if search:
+            search_lower = search.lower()
+            df = df[
+                df['id'].astype(str).str.contains(search_lower, case=False) |
+                df['contribuinte'].astype(str).str.contains(search_lower, case=False) |
+                df['tipo_solicitacao'].astype(str).str.contains(search_lower, case=False)
+            ]
 
-    # Top Types
-    by_type_data = []
-    if not df.empty and 'tipo_solicitacao' in df.columns:
-        by_type = df['tipo_solicitacao'].value_counts().head(10).reset_index()
-        by_type.columns = ['type', 'count']
-        by_type_data = by_type.to_dict('records')
+        # Type Filter
+        if type_filter:
+            types = type_filter.split(',')
+            if 'tipo_solicitacao' in df.columns:
+                df = df[df['tipo_solicitacao'].isin(types)]
+                
+        # Status Filter
+        if status_filter:
+            statuses = status_filter.split(',')
+            if 'status' in df.columns:
+                df = df[df['status'].isin(statuses)]
 
-    return {
-        "total": total,
-        "encerrados": encerrados_count,
-        "andamento": andamento_count,
-        "atrasados": atrasados_count,
-        "by_month": evolution_data,
-        "by_type": by_type_data,
-        "all_statuses": all_statuses,
-        "all_types": all_types,
-        "available_months": available_months
-    }
+        # Date Range Filter
+        if start_date:
+            if 'dt' in df.columns:
+                df = df[df['dt'] >= pd.to_datetime(start_date)]
+        if end_date:
+            if 'dt' in df.columns:
+                df = df[df['dt'] <= pd.to_datetime(end_date)]
+
+        # Only Delayed
+        if only_delayed:
+            if 'is_atrasado' in df.columns:
+                df = df[df['is_atrasado'] == True]
+
+        # 3. Calculate KPIs (from Filtered Data)
+        total = len(df)
+        
+        encerrados_mask = df['status'].str.contains('ENCERRAMENTO|DEFERIDO|INDEFERIDO', na=False, case=False) if 'status' in df.columns else pd.Series([False] * len(df))
+        encerrados_count = len(df[encerrados_mask]) if not df.empty else 0
+        
+        andamento_count = len(df[df['status'] == 'ANDAMENTO']) if not df.empty and 'status' in df.columns else 0
+        atrasados_count = len(df[df['is_atrasado'] == True]) if not df.empty and 'is_atrasado' in df.columns else 0
+        
+        # 4. Calculate Charts (from Filtered Data)
+        
+        # Evolution by Month
+        evolution_data = []
+        if not df.empty and 'month_year' in df.columns:
+             evolution = df.groupby('month_year').agg(
+                total=('id', 'count'),
+                encerrados=('status', lambda x: x.str.contains('ENCERRAMENTO|DEFERIDO|INDEFERIDO', na=False, case=False).sum()),
+                andamento=('status', lambda x: (x == 'ANDAMENTO').sum()),
+                atrasados=('is_atrasado', 'sum')
+            ).reset_index().sort_values('month_year')
+             evolution_data = evolution.to_dict('records')
+
+        # Top Types
+        by_type_data = []
+        if not df.empty and 'tipo_solicitacao' in df.columns:
+            by_type = df['tipo_solicitacao'].value_counts().head(10).reset_index()
+            by_type.columns = ['type', 'count']
+            by_type_data = by_type.to_dict('records')
+
+        # Top Delayed Types
+        by_type_delayed_data = []
+        if not df.empty and 'tipo_solicitacao' in df.columns and 'is_atrasado' in df.columns:
+            delayed_df = df[df['is_atrasado'] == True]
+            if not delayed_df.empty:
+                by_type_delayed = delayed_df['tipo_solicitacao'].value_counts().head(10).reset_index()
+                by_type_delayed.columns = ['type', 'count']
+                by_type_delayed_data = by_type_delayed.to_dict('records')
+
+        return {
+            "total": total,
+            "encerrados": encerrados_count,
+            "andamento": andamento_count,
+            "atrasados": atrasados_count,
+            "by_month": evolution_data,
+            "by_type": by_type_data,
+            "by_type_delayed": by_type_delayed_data,
+            "all_statuses": all_statuses,
+            "all_types": all_types,
+            "available_months": available_months
+        }
+    except Exception as e:
+        logger.error(f"Error in get_stats: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Stats calculation error: {str(e)}")
 
 
 
@@ -260,12 +315,14 @@ def get_processes(
     status_filter: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    only_delayed: bool = False
+    only_delayed: bool = False,
+    user_id: str = Depends(get_current_user)
 ):
-    if not DB:
+    user_data = DB.get(user_id, [])
+    if not user_data:
         return {"data": [], "total": 0, "page": page, "pages": 0}
         
-    df = pd.DataFrame(DB)
+    df = pd.DataFrame(user_data)
     
     # Normalize Request Type to avoid duplicates (e.g. "Tipo A" vs "Tipo A ")
     if 'tipo_solicitacao' in df.columns:
@@ -342,16 +399,17 @@ def export_excel(
     status_filter: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    only_delayed: bool = False
+    only_delayed: bool = False,
+    user_id: str = Depends(get_current_user)
 ):
     """Export filtered processes to a formatted Excel file."""
     import xlsxwriter
     from datetime import datetime
 
-    if not DB:
+    if not DB.get(user_id):
         raise HTTPException(status_code=400, detail="Nenhum dado disponível para exportar.")
 
-    df = pd.DataFrame(DB)
+    df = pd.DataFrame(DB[user_id])
 
     # Normalize Request Type to avoid duplicates (e.g. "Tipo A" vs "Tipo A ")
     if 'tipo_solicitacao' in df.columns:
@@ -574,6 +632,140 @@ async def serve_react_app(full_path: str):
         return FileResponse(index_path)
         
     return {"message": "Frontend not built or not found (run 'npm run build' in frontend/)"}
+
+from .ai_agent import generate_analysis_stream
+
+@app.post("/api/generate-report")
+async def generate_report(
+    search: Optional[str] = None, 
+    type_filter: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    only_delayed: bool = False,
+    user_prompt: Optional[str] = None,
+    user_id: str = Depends(get_current_user)
+):
+    """
+    Generates an AI report based on the filtered data.
+    Streams the response in Markdown format.
+    """
+    user_data = DB.get(user_id, [])
+    if not user_data:
+        # Stream a message saying no data
+        async def no_data_gen():
+            yield "Não há dados disponíveis para análise."
+        return StreamingResponse(no_data_gen(), media_type="text/markdown")
+
+    df = pd.DataFrame(user_data)
+
+    # --- Filtering Logic (Same as other endpoints) ---
+    
+    # Normalize Request Type
+    if 'tipo_solicitacao' in df.columns:
+        df['tipo_solicitacao'] = df['tipo_solicitacao'].astype(str).str.strip().str.replace(r'\s+', ' ', regex=True)
+
+    # Pre-process dates
+    if 'data_abertura' in df.columns:
+        df['dt'] = pd.to_datetime(df['data_abertura'], format='%d/%m/%Y', errors='coerce')
+    
+    # Apply Filters
+    if start_date and 'dt' in df.columns:
+        df = df[df['dt'] >= pd.to_datetime(start_date)]
+    if end_date and 'dt' in df.columns:
+        df = df[df['dt'] <= pd.to_datetime(end_date)]
+
+    if status_filter:
+        statuses = [s.strip() for s in status_filter.split(',')]
+        if 'status' in df.columns:
+            df = df[df['status'].isin(statuses)]
+
+    if only_delayed and 'is_atrasado' in df.columns:
+        df = df[df['is_atrasado'] == True]
+
+    if type_filter:
+        types = [t.strip() for t in type_filter.split(',')]
+        if 'tipo_solicitacao' in df.columns:
+            df = df[df['tipo_solicitacao'].isin(types)]
+
+    if search:
+        search_lower = search.lower()
+        mask = (
+            df['id'].astype(str).str.lower().str.contains(search_lower) |
+            df['contribuinte'].astype(str).str.lower().str.contains(search_lower)
+        )
+        if 'tipo_solicitacao' in df.columns:
+             mask |= df['tipo_solicitacao'].astype(str).str.lower().str.contains(search_lower)
+        df = df[mask]
+    
+    # --- End Filtering ---
+
+    return StreamingResponse(
+        generate_analysis_stream(df, user_prompt or ""),
+        media_type="text/markdown"
+    )
+
+@app.post("/api/shutdown")
+def shutdown_server():
+    """Shuts down the application server."""
+    import time
+    import threading
+    import os
+    
+    # Run in a separate thread to allow response to be sent first
+    def kill():
+        time.sleep(1)
+        logger.info("Shutting down server requested by user.")
+        os._exit(0)
+        
+    threading.Thread(target=kill).start()
+    return {"message": "Desligando servidor..."}
+
+
+# --- FEEDBACK SYSTEM ---
+
+class FeedbackModel(BaseModel):
+    user_id: str
+    report_content: str
+    rating: str  # "positive" or "negative"
+    comment: Optional[str] = None
+    timestamp: float = 0.0
+
+FEEDBACK_FILE = os.path.join(os.path.dirname(__file__), "data", "feedback_log.json")
+
+@app.post("/api/feedback")
+def submit_feedback(feedback: FeedbackModel):
+    """
+    Saves user feedback to refine future AI generations.
+    """
+    try:
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(FEEDBACK_FILE), exist_ok=True)
+        
+        # Load existing
+        feedbacks = []
+        if os.path.exists(FEEDBACK_FILE):
+            try:
+                with open(FEEDBACK_FILE, "r", encoding="utf-8") as f:
+                    feedbacks = json.load(f)
+            except json.JSONDecodeError:
+                feedbacks = [] # Reset if corrupted
+
+        # Add new
+        entry = feedback.dict()
+        entry["timestamp"] = time.time()
+        feedbacks.append(entry)
+        
+        # Save
+        with open(FEEDBACK_FILE, "w", encoding="utf-8") as f:
+            json.dump(feedbacks, f, indent=2, ensure_ascii=False)
+            
+        logger.info(f"Feedback received from {feedback.user_id}: {feedback.rating}")
+        return {"message": "Feedback received!", "status": "success"}
+        
+    except Exception as e:
+        logger.error(f"Error saving feedback: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
