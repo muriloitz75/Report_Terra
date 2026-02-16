@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 // @ts-ignore
 import remarkGfm from 'remark-gfm';
 import { useReport } from '@/context/ReportContext';
+import { submitFeedback } from '@/lib/api';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -97,20 +98,9 @@ function RelatoriosContent() {
         if (!report || feedbackGiven) return;
 
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/feedback`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_id: "default_user", // Hardcoded for local mode
-                    report_content: report,
-                    rating: rating
-                })
-            });
-
-            if (response.ok) {
-                setFeedbackGiven(rating);
-                // Optional: Show toast
-            }
+            await submitFeedback("default_user", report, rating);
+            setFeedbackGiven(rating);
+            // Optional: Show toast
         } catch (error) {
             console.error("Error sending feedback:", error);
         }

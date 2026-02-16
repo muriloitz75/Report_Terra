@@ -56,6 +56,35 @@ app.add_middleware(
 # DB is now a Dict where key is user_id and value is List of records
 DB: Dict[str, List[Dict[str, Any]]] = {}
 
+# Persistence Configuration
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+DB_FILE = os.path.join(DATA_DIR, "db_persistence.json")
+
+def load_db():
+    """Load database from JSON file."""
+    global DB
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r", encoding="utf-8") as f:
+                DB = json.load(f)
+            logger.info(f"Database loaded from {DB_FILE}. Users found: {list(DB.keys())}")
+        except Exception as e:
+            logger.error(f"Failed to load database: {e}")
+            DB = {}
+    else:
+        logger.info("No existing database file found. Starting fresh.")
+
+def save_db():
+    """Save database to JSON file."""
+    global DB
+    try:
+        os.makedirs(DATA_DIR, exist_ok=True)
+        with open(DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(DB, f, indent=2, ensure_ascii=False)
+        logger.info(f"Database saved to {DB_FILE}")
+    except Exception as e:
+        logger.error(f"Failed to save database: {e}")
+
 # Security Scheme - Removed for Local Mode
 # security = HTTPBearer()
 
@@ -65,6 +94,14 @@ def get_current_user() -> str:
     Authentication has been disabled.
     """
     return "default_user"
+
+@app.on_event("startup")
+async def startup_event():
+    load_db()
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    save_db()
 
 # Global Upload State - Per User?
 # For simplicity, we keep it global but we could make it per-user too.
@@ -100,6 +137,9 @@ def process_pdf_background(tmp_path: str, user_id: str):
             DB[user_id] = []
         
         DB[user_id].extend(data)
+        
+        # Persist changes
+        save_db()
         
         user_state["status"] = "completed"
         user_state["processed_count"] = len(data)
@@ -172,6 +212,7 @@ def clear_records(user_id: str = Depends(get_current_user)):
     count = len(user_data)
     
     DB[user_id] = [] # Clear only this user's data
+    save_db() # Persist changes
     
     # Also reset status
     if user_id in UPLOAD_STATE:

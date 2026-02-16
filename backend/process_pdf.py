@@ -1,5 +1,6 @@
 import pdfplumber
 import re
+import os
 from datetime import datetime, timedelta
 import logging
 import unicodedata
@@ -17,6 +18,12 @@ def normalize_text(text):
     # Replace various dashes with standard hyphen
     text_normalized = text_no_accents.replace('–', '-').replace('—', '-').upper()
     return text_normalized.strip()
+
+# Business Rules Configuration
+try:
+    DELAY_THRESHOLD_DAYS = int(os.getenv("DELAY_THRESHOLD_DAYS", "30"))
+except ValueError:
+    DELAY_THRESHOLD_DAYS = 30
 
 def parse_pdf(pdf_path):
     processes = []
@@ -141,7 +148,7 @@ def parse_pdf(pdf_path):
                         # Actually user said "Atrasados (Este último em relação aos em andamento)".
                         # This implies we check delay ONLY for "ANDAMENTO".
                         
-                        if status == "ANDAMENTO" and days_since_entry > 30:
+                        if status == "ANDAMENTO" and days_since_entry > DELAY_THRESHOLD_DAYS:
                             is_delayed = True
                             
                     processes.append({
@@ -153,7 +160,7 @@ def parse_pdf(pdf_path):
                         "setor_atual": sector_current,
                         "tipo_solicitacao": request_type_full,
                         "dias_atraso_pdf": days_delay_pdf,
-                        "dias_atraso_calc": days_since_entry - 30 if is_delayed else 0, # Positive delay
+                        "dias_atraso_calc": days_since_entry - DELAY_THRESHOLD_DAYS if is_delayed else 0, # Positive delay
                         "is_atrasado": is_delayed
                     })
                 else:

@@ -106,6 +106,19 @@ export const clearRecords = async (): Promise<{ message: string; cleared: number
     return response.data;
 };
 
+export const submitFeedback = async (
+    userId: string,
+    reportContent: string,
+    rating: 'positive' | 'negative'
+): Promise<{ message: string; status: string }> => {
+    const response = await axios.post(`${API_URL}/api/feedback`, {
+        user_id: userId,
+        report_content: reportContent,
+        rating: rating
+    });
+    return response.data;
+};
+
 export const generateReport = async (
     onChunk: (chunk: string) => void,
     search = '',
