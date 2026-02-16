@@ -24,7 +24,10 @@
       "Bash(cmd /c \"taskkill /F /PID 6056\")",
       "Bash(cmd /c \"taskkill /F /PID 20476\")",
       "Bash(powershell -Command:*)",
-      "Bash(/c/Users/Murilo/Desktop/Projects/Report_Terra/.venv/Scripts/python -m uvicorn:*)"
+      "Bash(/c/Users/Murilo/Desktop/Projects/Report_Terra/.venv/Scripts/python -m uvicorn:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
