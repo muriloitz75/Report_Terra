@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Standalone output for Docker/Railway
-  output: 'standalone',
+  // Static export for Docker/Railway (Python backend serves files)
+  output: 'export',
 
   // Enable compression
   compress: true,
@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
 
   // Image optimization
   images: {
+    unoptimized: true, // Required for static export
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 60,
   },
