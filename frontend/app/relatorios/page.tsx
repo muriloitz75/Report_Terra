@@ -4,17 +4,20 @@ import { useState, useEffect, Suspense } from 'react';
 import ReactMarkdown from 'react-markdown';
 // @ts-ignore
 import remarkGfm from 'remark-gfm';
+import { useSession } from 'next-auth/react';
 import { useReport } from '@/context/ReportContext';
 import { submitFeedback } from '@/lib/api';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { FileText, Bot, Loader2, Sparkles, Trash2, Wand2, Download, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { FileText, Bot, Loader2, Sparkles, Trash2, Wand2, Download, ThumbsUp, ThumbsDown, Lock } from 'lucide-react';
 
 
 
 function RelatoriosContent() {
     const { report, loading, generate, clearReport: contextClearReport } = useReport();
+    const { data: session } = useSession();
+    const canGenerate = (session as any)?.role === 'admin' || (session as any)?.canGenerateReport === true;
     const [prompt, setPrompt] = useState("");
     const [feedbackGiven, setFeedbackGiven] = useState<"positive" | "negative" | null>(null);
 
@@ -324,20 +327,31 @@ Todas as informações são baseadas nos dados disponíveis no momento da geraç
                         />
                         <Button
                             onClick={handleGenerate}
-                            disabled={loading || !prompt.trim()}
+                            disabled={loading || !prompt.trim() || !canGenerate}
                             size="icon"
                             className="absolute right-2 bottom-2 h-9 w-9 bg-purple-600 hover:bg-purple-700 text-white rounded-lg disabled:opacity-50 transition-all"
+                            title={!canGenerate ? "Sem permissão para gerar relatórios" : undefined}
                         >
                             {loading ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : !canGenerate ? (
+                                <Lock className="w-4 h-4" />
                             ) : (
                                 <Sparkles className="w-4 h-4 fill-white" />
                             )}
                         </Button>
                     </div>
-                    <p className="text-[10px] text-center text-slate-400 mt-3 font-medium">
-                        Report Terra AI pode cometer erros. Verifique as informações importantes.
-                    </p>
+                    {!canGenerate && (
+                        <p className="text-[11px] text-center text-amber-600 dark:text-amber-400 mt-2 font-medium flex items-center justify-center gap-1">
+                            <Lock className="w-3 h-3" />
+                            Acesso restrito. Solicite ao administrador para liberar a geração de relatórios IA.
+                        </p>
+                    )}
+                    {canGenerate && (
+                        <p className="text-[10px] text-center text-slate-400 mt-3 font-medium">
+                            Report Terra AI pode cometer erros. Verifique as informações importantes.
+                        </p>
+                    )}
                 </div>
             </div>
         </div>

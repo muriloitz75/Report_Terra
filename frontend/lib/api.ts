@@ -1,9 +1,38 @@
 
 import axios from 'axios';
+import { getSession } from 'next-auth/react';
 
 // In production (unified deploy), use relative URL (empty string = same origin).
-// In development, set NEXT_PUBLIC_API_URL=http://localhost:8000
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+// In development, set NEXT_PUBLIC_API_URL or rely on default
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+const api = axios.create({
+    baseURL: API_URL
+});
+
+// Request interceptor to add the auth token header to requests
+api.interceptors.request.use(
+    async (config) => {
+        const session = await getSession();
+        console.log('[API] Interceptor running for:', config.url);
+        if (session) {
+            console.log('[API] Session found:', { user: session.user?.email, hasToken: !!(session as any).accessToken });
+        } else {
+            console.log('[API] No session found');
+        }
+
+        if (session && (session as any).accessToken) {
+            config.headers.Authorization = `Bearer ${(session as any).accessToken}`;
+            console.log('[API] Token attached to header');
+        } else {
+            console.log('[API] No token attached');
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
 
 export interface KPIStats {
     total: number;
@@ -48,7 +77,7 @@ export interface UploadStatus {
 
 
 export const getUploadStatus = async (): Promise<UploadStatus> => {
-    const response = await axios.get(`${API_URL}/upload/status`);
+    const response = await api.get(`${API_URL}/upload/status`);
     return response.data;
 };
 
@@ -58,7 +87,7 @@ export const uploadPDF = async (file: File) => {
 
     const headers: Record<string, string> = { 'Content-Type': 'multipart/form-data' };
 
-    const response = await axios.post(`${API_URL}/upload`, formData, {
+    const response = await api.post(`${API_URL}/upload`, formData, {
         headers,
         timeout: 300000 // 5 minutes timeout for large PDFs
     });
@@ -67,7 +96,7 @@ export const uploadPDF = async (file: File) => {
 
 export const getStats = async (startDate = '', endDate = ''): Promise<KPIStats> => {
     const params = { start_date: startDate, end_date: endDate };
-    const response = await axios.get(`${API_URL}/stats`, { params });
+    const response = await api.get(`${API_URL}/stats`, { params });
     return response.data;
 };
 
@@ -76,7 +105,7 @@ export const getProcesses = async (page = 1, limit = 10, search = '', typeFilter
     const statusParam = statusFilter.join(',');
     const params = { page, limit, search, type_filter: typeParam, status_filter: statusParam, start_date: startDate, end_date: endDate, only_delayed: onlyDelayed };
 
-    const response = await axios.get(`${API_URL}/processes`, { params });
+    const response = await api.get(`${API_URL}/processes`, { params });
     return response.data;
 };
 
@@ -85,7 +114,7 @@ export const exportExcel = async (search = '', typeFilter: string[] = [], status
     const statusParam = statusFilter.join(',');
     const params = { search, type_filter: typeParam, status_filter: statusParam, start_date: startDate, end_date: endDate, only_delayed: onlyDelayed };
 
-    const response = await axios.get(`${API_URL}/export-excel`, { params, responseType: 'blob' });
+    const response = await api.get(`${API_URL}/export-excel`, { params, responseType: 'blob' });
 
     const contentDisposition = response.headers['content-disposition'];
     const filenameMatch = contentDisposition?.match(/filename="?(.+?)"?$/);
@@ -102,7 +131,7 @@ export const exportExcel = async (search = '', typeFilter: string[] = [], status
 };
 
 export const clearRecords = async (): Promise<{ message: string; cleared: number }> => {
-    const response = await axios.delete(`${API_URL}/clear`);
+    const response = await api.delete(`${API_URL}/clear`);
     return response.data;
 };
 
@@ -139,10 +168,13 @@ export const generateReport = async (
     if (statusFilter.length > 0) params.append('status_filter', statusFilter.join(','));
 
     // Note: We use fetch here because axios doesn't support streaming response body as easily in browser
+    const session = await getSession();
+    const token = (session as any)?.accessToken;
     const response = await fetch(`${API_URL}/api/generate-report?${params.toString()}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
     });
 
@@ -157,6 +189,45 @@ export const generateReport = async (
         const chunk = decoder.decode(value, { stream: true });
         onChunk(chunk);
     }
+};
+
+export interface AdminUser {
+    id: number;
+    email: string;
+    full_name?: string;
+    role: string;
+    can_generate_report: boolean;
+    is_active: boolean;
+    created_at: string;
+}
+
+export const getAdminUsers = async (): Promise<AdminUser[]> => {
+    const response = await api.get('/admin/users');
+    return response.data;
+};
+
+export const updateAdminUser = async (
+    id: number,
+    data: Partial<Pick<AdminUser, 'role' | 'can_generate_report' | 'is_active'>>
+): Promise<AdminUser> => {
+    const response = await api.patch(`/admin/users/${id}`, data);
+    return response.data;
+};
+
+export const createAdminUser = async (data: {
+    email: string;
+    password: string;
+    full_name?: string;
+    role?: string;
+    can_generate_report?: boolean;
+}): Promise<AdminUser> => {
+    const response = await api.post('/admin/users', data);
+    return response.data;
+};
+
+export const deactivateAdminUser = async (id: number): Promise<{ message: string }> => {
+    const response = await api.delete(`/admin/users/${id}`);
+    return response.data;
 };
 
 export const shutdownApp = async (): Promise<void> => {

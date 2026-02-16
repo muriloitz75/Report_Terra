@@ -12,6 +12,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 });
 
 import { ReportProvider } from "@/context/ReportContext";
+import { SessionProvider } from "./SessionProvider";
 
 export const metadata: Metadata = {
   title: "Report Terra",
@@ -33,12 +34,14 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <ReportProvider>
-            <div className="flex h-screen overflow-hidden">
-              <AppSidebar />
-              <main className="flex-1 overflow-y-auto">
-                {children}
-              </main>
-            </div>
+            <SessionProvider>
+              <div className="flex h-screen overflow-hidden">
+                <AppSidebar />
+                <main className="flex-1 overflow-y-auto">
+                  {children}
+                </main>
+              </div>
+            </SessionProvider>
           </ReportProvider>
         </ThemeProvider>
       </body>

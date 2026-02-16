@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Static export for Docker/Railway (Python backend serves files)
-  output: 'export',
+  // Static export removed for NextAuth support
+  // output: 'export',
 
   // Enable compression
   compress: true,

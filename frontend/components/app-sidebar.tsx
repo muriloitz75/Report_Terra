@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, TableProperties, FileText, Menu, X, LogOut } from "lucide-react";
+import { LayoutDashboard, TableProperties, FileText, Menu, X, LogOut, Shield } from "lucide-react";
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
@@ -11,6 +12,11 @@ export function AppSidebar() {
     const [isOpen, setIsOpen] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [isShutdown, setIsShutdown] = useState(false);
+    const { data: session } = useSession();
+
+    const isAdmin = (session as any)?.role === "admin";
+    const userEmail = session?.user?.email || "Usuário";
+    const userInitial = userEmail.charAt(0).toUpperCase();
 
     const handleShutdown = async () => {
         if (confirm("Deseja realmente encerrar a aplicação?")) {
@@ -44,7 +50,7 @@ export function AppSidebar() {
 
             {/* Sidebar Container */}
             <aside
-                className={`fixed inset-y-0 left-0 z-40 bg-slate-900 text-slate-100 transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 
+                className={`fixed inset-y-0 left-0 z-40 bg-slate-900 text-slate-100 transform transition-all duration-300 ease-in-out md:relative md:translate-x-0
                 ${isOpen ? "translate-x-0" : "-translate-x-full"}
                 ${isHovered ? "md:w-64" : "md:w-20"}
                 w-64`}
@@ -86,6 +92,24 @@ export function AppSidebar() {
                                 </Link>
                             );
                         })}
+
+                        {/* Admin link - only for admins */}
+                        {isAdmin && (
+                            <Link
+                                href="/admin"
+                                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium whitespace-nowrap h-10 ${pathname === "/admin"
+                                    ? "bg-amber-600 text-white shadow-sm"
+                                    : "text-amber-400 hover:text-white hover:bg-amber-700/40"
+                                    }`}
+                                onClick={() => setIsOpen(false)}
+                                title={!isHovered ? "Painel Admin" : undefined}
+                            >
+                                <Shield className="w-4 h-4 shrink-0" />
+                                <span className={`transition-opacity duration-300 ${!isHovered && "md:opacity-0 md:w-0 md:hidden"}`}>
+                                    Painel Admin
+                                </span>
+                            </Link>
+                        )}
                     </nav>
 
                     {/* Footer User/Actions */}
@@ -97,11 +121,11 @@ export function AppSidebar() {
                         <div className="bg-slate-800/50 rounded-lg p-3 flex items-center justify-between h-14 overflow-hidden group">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 shrink-0">
-                                    <span className="text-xs font-bold">U</span>
+                                    <span className="text-xs font-bold">{userInitial}</span>
                                 </div>
                                 <div className={`flex flex-col transition-opacity duration-300 whitespace-nowrap ${!isHovered && "md:opacity-0 md:w-0 md:hidden"}`}>
-                                    <span className="text-xs font-medium text-slate-200">Usuário Local</span>
-                                    <span className="text-[10px] text-slate-500">Modo Offline</span>
+                                    <span className="text-xs font-medium text-slate-200 max-w-[120px] truncate">{userEmail}</span>
+                                    <span className="text-[10px] text-slate-500">{isAdmin ? "Administrador" : "Usuário"}</span>
                                 </div>
                             </div>
 
