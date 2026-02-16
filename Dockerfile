@@ -39,7 +39,7 @@ ENV BACKEND_API_URL=http://localhost:8000
 # Criar script de inicialização que inicia ambos os serviços
 RUN echo '#!/bin/sh' > /app/start.sh && \
     echo 'echo "Iniciando backend na porta 8000..."' >> /app/start.sh && \
-    echo 'cd /app && python3 -c "import os; import uvicorn; uvicorn.run(\"backend.main:app\", host=\"0.0.0.0\", port=8000)" &' >> /app/start.sh && \
+    echo 'cd /app/backend && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 &' >> /app/start.sh && \
     echo 'sleep 3' >> /app/start.sh && \
     echo 'echo "Iniciando frontend na porta 3000..."' >> /app/start.sh && \
     echo 'cd /app/frontend/standalone && PORT=3000 node server.js' >> /app/start.sh && \
