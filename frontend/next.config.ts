@@ -22,8 +22,16 @@ const nextConfig: NextConfig = {
     const apiUrl = process.env.BACKEND_API_URL || 'http://localhost:8000';
     return [
       {
-        source: '/api/:path*',
-        destination: `${apiUrl}/api/:path*`,
+        source: '/api/generate-report',
+        destination: `${apiUrl}/api/generate-report`,
+      },
+      {
+        source: '/api/feedback',
+        destination: `${apiUrl}/api/feedback`,
+      },
+      {
+        source: '/api/shutdown',
+        destination: `${apiUrl}/api/shutdown`,
       },
       {
         source: '/token',

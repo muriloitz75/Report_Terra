@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, IBM_Plex_Mono } from "next/font/google"; // Import IBM Plex Mono
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import { AppSidebar } from "@/components/app-sidebar";
+import { ConditionalSidebar } from "@/components/conditional-sidebar";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const ibmPlexMono = IBM_Plex_Mono({
@@ -36,7 +36,7 @@ export default function RootLayout({
           <ReportProvider>
             <SessionProvider>
               <div className="flex h-screen overflow-hidden">
-                <AppSidebar />
+                <ConditionalSidebar />
                 <main className="flex-1 overflow-y-auto">
                   {children}
                 </main>
