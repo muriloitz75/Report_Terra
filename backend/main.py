@@ -90,8 +90,15 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         if user is None:
             logger.warning(f"Token validation failed: User {email} not found in DB")
             raise HTTPException(status_code=401, detail="User not found")
+        
+        # Verifica se o usuário está ativo
+        if not user.is_active:
+            logger.warning(f"Token validation failed: User {email} is not active")
+            raise HTTPException(status_code=401, detail="User account is deactivated")
             
         return user
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error in get_current_user: {e}")
         raise

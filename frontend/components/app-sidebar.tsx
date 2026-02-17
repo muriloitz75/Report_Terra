@@ -130,15 +130,7 @@ export function AppSidebar() {
                             </div>
 
                             <div className={`flex items-center gap-1 transition-opacity duration-300 ${!isHovered && "md:opacity-0 md:w-0 md:hidden"}`}>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-slate-500 hover:text-amber-400 hover:bg-amber-400/10 h-8 w-8"
-                                    onClick={() => signOut({ callbackUrl: "/login" })}
-                                    title="Sair"
-                                >
-                                    <LogOut className="w-4 h-4" />
-                                </Button>
+
                                 <Button
                                     variant="ghost"
                                     size="icon"
