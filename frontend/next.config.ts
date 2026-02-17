@@ -54,6 +54,10 @@ const nextConfig: NextConfig = {
         destination: `${apiUrl}/processes`,
       },
       {
+        source: '/upload',
+        destination: `${apiUrl}/upload`,
+      },
+      {
         source: '/upload/:path*',
         destination: `${apiUrl}/upload/:path*`,
       },

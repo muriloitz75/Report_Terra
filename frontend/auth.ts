@@ -20,7 +20,7 @@ const getBackendUrl = () => {
         return '';
     }
     // No servidor, usa a URL direta do backend
-    return process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    return process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 };
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -37,6 +37,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             authorize: async (credentials) => {
                 try {
                     const backendUrl = getBackendUrl();
+                    console.log(`[Auth] Attempting login for ${credentials.email} via ${backendUrl}/token`);
                     const res = await fetch(`${backendUrl}/token`, {
                         method: "POST",
                         headers: {
@@ -49,12 +50,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     })
 
                     if (!res.ok) {
-                        throw new Error("Invalid credentials")
+                        console.log(`[Auth] Backend returned ${res.status}: invalid credentials`);
+                        return null
                     }
 
                     const data = await res.json()
                     const payload = decodeJWTPayload(data.access_token);
 
+                    console.log(`[Auth] Login successful for ${credentials.email}`);
                     // Return user object compatible with NextAuth
                     return {
                         id: credentials.email as string,
@@ -64,6 +67,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                         canGenerateReport: payload.can_generate_report || false,
                     }
                 } catch (error) {
+                    console.error(`[Auth] Connection error to backend:`, error);
                     return null
                 }
             },

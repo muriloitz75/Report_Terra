@@ -112,17 +112,12 @@ def get_admin_user(current_user: User = Depends(get_current_user)):
 # Auth Routes
 @app.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    print(f"--- LOGIN ATTEMPT ---")
-    print(f"Username received: '{form_data.username}'")
-    
+    logger.debug(f"Login attempt for: '{form_data.username}'")
+
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user:
-        print(f"User not found in DB.")
-    else:
-        print(f"User found: ID {user.id}, Hash: {user.hashed_password[:10]}...")
-        is_valid = auth.verify_password(form_data.password, user.hashed_password)
-        print(f"Password verification result: {is_valid}")
-        
+        logger.debug(f"User not found: '{form_data.username}'")
+
     if not user or not auth.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=401,
