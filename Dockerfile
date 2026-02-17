@@ -35,9 +35,9 @@ ENV LOG_LEVEL=INFO
 ENV NODE_ENV=production
 ENV BACKEND_API_URL=http://127.0.0.1:8000
 ENV AUTH_TRUST_HOST=true
-# AUTH_SECRET deve ser passado via variável de ambiente no deploy (não hardcoded)
-# Ex: docker run -e AUTH_SECRET=sua-chave-secreta ...
-ENV AUTH_SECRET=""
+# AUTH_SECRET para NextAuth - sobrescreva no Railway com valor próprio
+ENV AUTH_SECRET=BiKvv86s2w9c2PKCOSnawKoEgTUXeiM-4YGXQb5oHFQ
+ENV SECRET_KEY=RCxwTuUgyyz6lrcDk4ApWd7cK_FgCzTcu_C24WWtDig
 
 # Criar script de inicialização com supervisão do backend
 COPY start.sh /app/start.sh
