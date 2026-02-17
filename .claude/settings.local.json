@@ -27,7 +27,9 @@
       "Bash(/c/Users/Murilo/Desktop/Projects/Report_Terra/.venv/Scripts/python -m uvicorn:*)",
       "Bash(git push:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(/c/Users/Murilo/Desktop/Projects/Report_Terra/.venv/Scripts/python:*)",
+      "Bash(python3:*)"
     ]
   }
 }

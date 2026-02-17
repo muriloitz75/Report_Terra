@@ -1,8 +1,8 @@
-fastapi==0.115.0
-uvicorn[standard]==0.32.0
+fastapi>=0.115.6
+uvicorn[standard]>=0.34.0
 pandas==2.2.3
 pdfplumber==0.11.4
-python-multipart==0.0.12
+python-multipart>=0.0.18
 xlsxwriter==3.2.0
 
 # LangChain ecosystem - versões atualizadas e compatíveis
@@ -17,7 +17,8 @@ langchain-huggingface>=0.1.2
 python-jose[cryptography]
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
-pydantic[email]
+pydantic[email]>=2.0.0
+pydantic-settings>=2.0.0
 
 # Produção
 gunicorn==21.2.0

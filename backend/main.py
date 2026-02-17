@@ -104,7 +104,6 @@ def get_admin_user(current_user: User = Depends(get_current_user)):
 
 # Auth Routes
 @app.post("/token")
-@app.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     print(f"--- LOGIN ATTEMPT ---")
     print(f"Username received: '{form_data.username}'")
