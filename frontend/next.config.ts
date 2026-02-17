@@ -42,8 +42,16 @@ const nextConfig: NextConfig = {
         destination: `${apiUrl}/auth/:path*`,
       },
       {
-        source: '/admin/:path*',
-        destination: `${apiUrl}/admin/:path*`,
+        source: '/admin/users',
+        destination: `${apiUrl}/admin/users`,
+      },
+      {
+        source: '/admin/users/:path*',
+        destination: `${apiUrl}/admin/users/:path*`,
+      },
+      {
+        source: '/admin/audit/:path*',
+        destination: `${apiUrl}/admin/audit/:path*`,
       },
       {
         source: '/stats',

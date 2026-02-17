@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +16,7 @@ import logging
 import traceback
 import json
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 # Load .env from backend/ directory
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
@@ -59,8 +59,17 @@ from database import get_db, engine
 from models import Base, User
 import auth
 
-# Create tables (if not using alembic, but we are, so this is backup/safe)
+# Create tables (new tables auto-created, existing tables need manual migration)
 Base.metadata.create_all(bind=engine)
+
+# Migrate: add last_login column to users if missing
+try:
+    from sqlalchemy import text as sa_text
+    with engine.connect() as conn:
+        conn.execute(sa_text("ALTER TABLE users ADD COLUMN last_login DATETIME"))
+        conn.commit()
+except Exception:
+    pass  # Column already exists
 
 @app.get("/health")
 def health_check():
@@ -111,19 +120,30 @@ def get_admin_user(current_user: User = Depends(get_current_user)):
 
 # Auth Routes
 @app.post("/token")
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    from models import UserActivity
     logger.debug(f"Login attempt for: '{form_data.username}'")
 
+    ip_address = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "")[:200]
+
     user = db.query(User).filter(User.email == form_data.username).first()
-    if not user:
-        logger.debug(f"User not found: '{form_data.username}'")
 
     if not user or not auth.verify_password(form_data.password, user.hashed_password):
+        # Registrar tentativa falhada
+        db.add(UserActivity(user_id=user.id if user else None, action="login_failed", ip_address=ip_address, user_agent=user_agent, detail=form_data.username))
+        db.commit()
         raise HTTPException(
             status_code=401,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Registrar login bem-sucedido
+    user.last_login = datetime.utcnow()
+    db.add(UserActivity(user_id=user.id, action="login", ip_address=ip_address, user_agent=user_agent))
+    db.commit()
+
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
         data={
@@ -831,6 +851,140 @@ def admin_deactivate_user(user_id: int, admin: User = Depends(get_admin_user), d
     user.is_active = False
     db.commit()
     return {"message": f"Usuário {user.email} desativado"}
+
+# --- ADMIN AUDIT ENDPOINTS ---
+
+@app.get("/admin/audit/summary")
+def admin_audit_summary(admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    """KPIs globais de atividade."""
+    from models import UserActivity
+    from sqlalchemy import func
+
+    now = datetime.utcnow()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
+
+    total_users = db.query(User).count()
+
+    # Usuários ativos (que fizeram login) por período
+    def active_users_since(since):
+        return db.query(func.count(func.distinct(UserActivity.user_id))).filter(
+            UserActivity.action == "login",
+            UserActivity.timestamp >= since
+        ).scalar() or 0
+
+    # Contagem de logins
+    def login_count_since(since):
+        return db.query(func.count(UserActivity.id)).filter(
+            UserActivity.action == "login",
+            UserActivity.timestamp >= since
+        ).scalar() or 0
+
+    failed_today = db.query(func.count(UserActivity.id)).filter(
+        UserActivity.action == "login_failed",
+        UserActivity.timestamp >= today_start
+    ).scalar() or 0
+
+    return {
+        "total_users": total_users,
+        "active_users_today": active_users_since(today_start),
+        "active_users_week": active_users_since(week_ago),
+        "active_users_month": active_users_since(month_ago),
+        "total_logins_today": login_count_since(today_start),
+        "total_logins_week": login_count_since(week_ago),
+        "failed_logins_today": failed_today,
+    }
+
+@app.get("/admin/audit/users")
+def admin_audit_users(admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    """Atividade por usuário."""
+    from models import UserActivity, Process
+    from sqlalchemy import func
+
+    now = datetime.utcnow()
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
+
+    users = db.query(User).all()
+    result = []
+
+    for u in users:
+        login_7d = db.query(func.count(UserActivity.id)).filter(
+            UserActivity.user_id == u.id,
+            UserActivity.action == "login",
+            UserActivity.timestamp >= week_ago
+        ).scalar() or 0
+
+        login_30d = db.query(func.count(UserActivity.id)).filter(
+            UserActivity.user_id == u.id,
+            UserActivity.action == "login",
+            UserActivity.timestamp >= month_ago
+        ).scalar() or 0
+
+        process_count = db.query(func.count(Process.id)).filter(
+            Process.user_id == u.id
+        ).scalar() or 0
+
+        result.append({
+            "user_id": u.id,
+            "email": u.email,
+            "full_name": u.full_name,
+            "role": getattr(u, 'role', 'user'),
+            "is_active": u.is_active,
+            "last_login": u.last_login.isoformat() if getattr(u, 'last_login', None) else None,
+            "login_count_7d": login_7d,
+            "login_count_30d": login_30d,
+            "total_processes": process_count,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+        })
+
+    return result
+
+@app.get("/admin/audit/activity")
+def admin_audit_activity(days: int = 30, admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    """Série temporal de logins diários para gráfico."""
+    from models import UserActivity
+    from sqlalchemy import func
+
+    since = datetime.utcnow() - timedelta(days=days)
+
+    rows = db.query(
+        func.date(UserActivity.timestamp).label("date"),
+        func.count(UserActivity.id).label("logins"),
+        func.count(func.distinct(UserActivity.user_id)).label("unique_users"),
+    ).filter(
+        UserActivity.action == "login",
+        UserActivity.timestamp >= since
+    ).group_by(
+        func.date(UserActivity.timestamp)
+    ).order_by("date").all()
+
+    return {
+        "daily_logins": [
+            {"date": str(r.date), "logins": r.logins, "unique_users": r.unique_users}
+            for r in rows
+        ]
+    }
+
+@app.get("/admin/audit/user/{user_id}/history")
+def admin_audit_user_history(user_id: int, limit: int = 50, admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    """Histórico de atividade de um usuário específico."""
+    from models import UserActivity
+
+    activities = db.query(UserActivity).filter(
+        UserActivity.user_id == user_id
+    ).order_by(UserActivity.timestamp.desc()).limit(limit).all()
+
+    return [
+        {
+            "action": a.action,
+            "ip_address": a.ip_address,
+            "user_agent": a.user_agent,
+            "timestamp": a.timestamp.isoformat() if a.timestamp else None,
+        }
+        for a in activities
+    ]
 
 # Mount static files (Frontend)
 # Only mount if directory exists (in production or after local build)

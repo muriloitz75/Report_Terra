@@ -14,9 +14,11 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     role = Column(String, default="user")  # "admin" or "user"
     can_generate_report = Column(Boolean, default=False)
+    last_login = Column(DateTime, nullable=True)
 
     processes = relationship("Process", back_populates="owner")
     reports = relationship("Report", back_populates="owner")
+    activities = relationship("UserActivity", back_populates="user")
 
 class Process(Base):
     __tablename__ = "processes"
@@ -55,3 +57,16 @@ class Report(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     owner = relationship("User", back_populates="reports")
+
+class UserActivity(Base):
+    __tablename__ = "user_activities"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    action = Column(String, nullable=False, index=True)  # "login", "login_failed"
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+    detail = Column(String, nullable=True)  # e.g. email for failed login
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+
+    user = relationship("User", back_populates="activities")

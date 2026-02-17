@@ -1,9 +1,6 @@
-
 import axios from 'axios';
 import { getSession } from 'next-auth/react';
 
-// Use URLs relativas - o Next.js fará o proxy para o backend via rewrites
-// Em desenvolvimento, o proxy do Next.js encaminha para localhost:8000
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 const api = axios.create({
@@ -14,18 +11,8 @@ const api = axios.create({
 api.interceptors.request.use(
     async (config) => {
         const session = await getSession();
-        console.log('[API] Interceptor running for:', config.url);
-        if (session) {
-            console.log('[API] Session found:', { user: session.user?.email, hasToken: !!(session as any).accessToken });
-        } else {
-            console.log('[API] No session found');
-        }
-
         if (session && (session as any).accessToken) {
             config.headers.Authorization = `Bearer ${(session as any).accessToken}`;
-            console.log('[API] Token attached to header');
-        } else {
-            console.log('[API] No token attached');
         }
         return config;
     },
@@ -74,10 +61,8 @@ export interface UploadStatus {
     error?: string;
 }
 
-
-
 export const getUploadStatus = async (): Promise<UploadStatus> => {
-    const response = await api.get(`${API_URL}/upload/status`);
+    const response = await api.get('/upload/status');
     return response.data;
 };
 
@@ -85,10 +70,8 @@ export const uploadPDF = async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
 
-    const headers: Record<string, string> = { 'Content-Type': 'multipart/form-data' };
-
-    const response = await api.post(`${API_URL}/upload`, formData, {
-        headers,
+    const response = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 300000 // 5 minutes timeout for large PDFs
     });
     return response.data;
@@ -96,7 +79,7 @@ export const uploadPDF = async (file: File) => {
 
 export const getStats = async (startDate = '', endDate = ''): Promise<KPIStats> => {
     const params = { start_date: startDate, end_date: endDate };
-    const response = await api.get(`${API_URL}/stats`, { params });
+    const response = await api.get('/stats', { params });
     return response.data;
 };
 
@@ -105,7 +88,7 @@ export const getProcesses = async (page = 1, limit = 10, search = '', typeFilter
     const statusParam = statusFilter.join(',');
     const params = { page, limit, search, type_filter: typeParam, status_filter: statusParam, start_date: startDate, end_date: endDate, only_delayed: onlyDelayed };
 
-    const response = await api.get(`${API_URL}/processes`, { params });
+    const response = await api.get('/processes', { params });
     return response.data;
 };
 
@@ -114,7 +97,7 @@ export const exportExcel = async (search = '', typeFilter: string[] = [], status
     const statusParam = statusFilter.join(',');
     const params = { search, type_filter: typeParam, status_filter: statusParam, start_date: startDate, end_date: endDate, only_delayed: onlyDelayed };
 
-    const response = await api.get(`${API_URL}/export-excel`, { params, responseType: 'blob' });
+    const response = await api.get('/export-excel', { params, responseType: 'blob' });
 
     const contentDisposition = response.headers['content-disposition'];
     const filenameMatch = contentDisposition?.match(/filename="?(.+?)"?$/);
@@ -131,7 +114,7 @@ export const exportExcel = async (search = '', typeFilter: string[] = [], status
 };
 
 export const clearRecords = async (): Promise<{ message: string; cleared: number }> => {
-    const response = await api.delete(`${API_URL}/clear`);
+    const response = await api.delete('/clear');
     return response.data;
 };
 
@@ -140,7 +123,7 @@ export const submitFeedback = async (
     reportContent: string,
     rating: 'positive' | 'negative'
 ): Promise<{ message: string; status: string }> => {
-    const response = await axios.post(`${API_URL}/api/feedback`, {
+    const response = await api.post('/api/feedback', {
         user_id: userId,
         report_content: reportContent,
         rating: rating
@@ -230,11 +213,68 @@ export const deactivateAdminUser = async (id: number): Promise<{ message: string
     return response.data;
 };
 
+// --- AUDIT ---
+
+export interface AuditSummary {
+    total_users: number;
+    active_users_today: number;
+    active_users_week: number;
+    active_users_month: number;
+    total_logins_today: number;
+    total_logins_week: number;
+    failed_logins_today: number;
+}
+
+export interface AuditUser {
+    user_id: number;
+    email: string;
+    full_name?: string;
+    role: string;
+    is_active: boolean;
+    last_login: string | null;
+    login_count_7d: number;
+    login_count_30d: number;
+    total_processes: number;
+    created_at: string;
+}
+
+export interface DailyLogin {
+    date: string;
+    logins: number;
+    unique_users: number;
+}
+
+export interface ActivityEntry {
+    action: string;
+    ip_address: string | null;
+    user_agent: string | null;
+    timestamp: string;
+}
+
+export const getAuditSummary = async (): Promise<AuditSummary> => {
+    const response = await api.get('/admin/audit/summary');
+    return response.data;
+};
+
+export const getAuditUsers = async (): Promise<AuditUser[]> => {
+    const response = await api.get('/admin/audit/users');
+    return response.data;
+};
+
+export const getAuditActivity = async (days = 30): Promise<{ daily_logins: DailyLogin[] }> => {
+    const response = await api.get('/admin/audit/activity', { params: { days } });
+    return response.data;
+};
+
+export const getAuditUserHistory = async (userId: number, limit = 50): Promise<ActivityEntry[]> => {
+    const response = await api.get(`/admin/audit/user/${userId}/history`, { params: { limit } });
+    return response.data;
+};
+
 export const shutdownApp = async (): Promise<void> => {
     try {
-        await axios.post(`${API_URL}/api/shutdown`);
+        await api.post('/api/shutdown');
     } catch (e) {
         // Ignore error as server dies
-        console.log("Server shutdown signal sent");
     }
 };

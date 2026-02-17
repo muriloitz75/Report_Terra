@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, TableProperties, FileText, Menu, X, LogOut, Shield, Power } from "lucide-react";
+import { LayoutDashboard, TableProperties, FileText, Menu, X, LogOut, Shield, Power, Activity } from "lucide-react";
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -107,6 +107,22 @@ export function AppSidebar() {
                                 <Shield className="w-4 h-4 shrink-0" />
                                 <span className={`transition-opacity duration-300 ${!isHovered && "md:opacity-0 md:w-0 md:hidden"}`}>
                                     Painel Admin
+                                </span>
+                            </Link>
+                        )}
+                        {isAdmin && (
+                            <Link
+                                href="/admin/auditoria"
+                                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium whitespace-nowrap h-10 ${pathname === "/admin/auditoria"
+                                    ? "bg-amber-600 text-white shadow-sm"
+                                    : "text-amber-400 hover:text-white hover:bg-amber-700/40"
+                                    }`}
+                                onClick={() => setIsOpen(false)}
+                                title={!isHovered ? "Auditoria" : undefined}
+                            >
+                                <Activity className="w-4 h-4 shrink-0" />
+                                <span className={`transition-opacity duration-300 ${!isHovered && "md:opacity-0 md:w-0 md:hidden"}`}>
+                                    Auditoria
                                 </span>
                             </Link>
                         )}
