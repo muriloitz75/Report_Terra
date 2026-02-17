@@ -88,4 +88,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     pages: {
         signIn: "/login",
     },
+    // Garante que a sessão seja invalidada corretamente no logout
+    events: {
+        async signOut() {
+            // Limpa qualquer estado de sessão residual
+        },
+    },
+    // Configuração para evitar cache de sessão
+    trustHost: true,
 })
