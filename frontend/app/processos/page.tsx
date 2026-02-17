@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { uploadPDF, getStats, getProcesses, exportExcel, clearRecords, PaginatedProcesses, getUploadStatus, KPIStats } from '@/lib/api';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ export default function ProcessosPage() {
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [uploadMessage, setUploadMessage] = useState("");
+    const [uploadProgress, setUploadProgress] = useState(0);
 
     // Filters
     const [page, setPage] = useState(1);
@@ -27,6 +28,8 @@ export default function ProcessosPage() {
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [onlyDelayed, setOnlyDelayed] = useState(false);
     const [exporting, setExporting] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
+    const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // Helper to load filter options (stats)
     const loadStats = async () => {
@@ -57,56 +60,101 @@ export default function ProcessosPage() {
 
     useEffect(() => {
         loadData();
-    }, [page, search, typeFilter, statusFilter, dateRange, onlyDelayed]);
+    }, [page, search, typeFilter, statusFilter, dateRange, onlyDelayed, refreshKey]);
+
+    // Cleanup polling on unmount
+    useEffect(() => {
+        return () => {
+            if (pollingRef.current) {
+                clearInterval(pollingRef.current);
+                pollingRef.current = null;
+            }
+        };
+    }, []);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return;
+        const file = e.target.files[0];
+        e.target.value = ''; // Reset input to allow re-uploading same file
 
         setUploading(true);
         setUploadMessage("Enviando arquivo...");
+        setUploadProgress(5);
 
         try {
             // 1. Send File (Returns immediately with 200/202)
-            await uploadPDF(e.target.files[0]);
+            await uploadPDF(file);
 
             // 2. Start Polling
-            setUploadMessage("Processando PDF (0%)...");
+            setUploadMessage("Processando PDF...");
+            setUploadProgress(10);
 
-            const interval = setInterval(async () => {
+            let pollFailCount = 0;
+            pollingRef.current = setInterval(async () => {
                 try {
                     const status = await getUploadStatus();
+                    pollFailCount = 0; // Reset on success
 
                     if (status.status === 'processing') {
                         setUploadMessage(status.message || "Processando...");
+                        // Extract percentage from backend message like "Salvando registros... 50/173 (28%)"
+                        const pctMatch = status.message?.match(/\((\d+)%\)/);
+                        if (pctMatch) {
+                            // Map backend 0-100% to display 10-95% (10% reserved for upload, 5% for finalization)
+                            setUploadProgress(10 + Math.round(parseInt(pctMatch[1]) * 0.85));
+                        } else if (status.message?.includes("Extraindo")) {
+                            setUploadProgress(15);
+                        }
                     } else if (status.status === 'completed') {
-                        clearInterval(interval);
-                        setUploadMessage("Concluído!");
+                        if (pollingRef.current) {
+                            clearInterval(pollingRef.current);
+                            pollingRef.current = null;
+                        }
+                        setUploadMessage(`Concluído! ${status.processed_count} registros.`);
+                        setUploadProgress(100);
 
-                        // Refresh Data
+                        // Refresh data - reset filters and force reload
                         setDateRange(undefined);
+                        setStats(null);
                         setPage(1);
-                        await loadData();
-                        await loadStats(); // Refresh stats for new filter options
+                        setRefreshKey(k => k + 1); // Force useEffect to fire even if other deps unchanged
 
                         // Reset UI after short delay
                         setTimeout(() => {
                             setUploading(false);
                             setUploadMessage("");
-                        }, 1000);
+                            setUploadProgress(0);
+                        }, 1500);
                     } else if (status.status === 'error') {
-                        clearInterval(interval);
+                        if (pollingRef.current) {
+                            clearInterval(pollingRef.current);
+                            pollingRef.current = null;
+                        }
                         setUploading(false);
                         setUploadMessage("");
+                        setUploadProgress(0);
                         alert(`Erro no processamento: ${status.error}`);
                     }
                 } catch (err) {
                     console.error("Polling error", err);
+                    pollFailCount++;
+                    if (pollFailCount >= 5) {
+                        if (pollingRef.current) {
+                            clearInterval(pollingRef.current);
+                            pollingRef.current = null;
+                        }
+                        setUploading(false);
+                        setUploadMessage("");
+                        setUploadProgress(0);
+                        alert("Falha ao verificar status do upload. Recarregue a página.");
+                    }
                 }
-            }, 1000); // Check every 1s
+            }, 1500);
 
         } catch (error: any) {
             setUploading(false);
             setUploadMessage("");
+            setUploadProgress(0);
             if (error.response?.status === 409) {
                 alert("Já existe um arquivo sendo processado. Por favor, aguarde.");
             } else {
@@ -145,16 +193,31 @@ export default function ProcessosPage() {
                             disabled={uploading}
                         />
                         <label htmlFor="pdf-upload">
-                            <Button variant="default" className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white" asChild disabled={uploading}>
-                                <span>
-                                    {uploading ? (
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    ) : (
+                            {uploading ? (
+                                <div className="flex flex-col gap-1.5 min-w-[200px] cursor-default">
+                                    <div className="flex items-center justify-between text-xs">
+                                        <span className="text-slate-600 dark:text-slate-400 truncate max-w-[160px]">
+                                            {uploadProgress >= 100 ? "Concluído!" : uploadMessage || "Processando..."}
+                                        </span>
+                                        <span className="font-bold text-blue-600 dark:text-blue-400 tabular-nums ml-2">
+                                            {uploadProgress}%
+                                        </span>
+                                    </div>
+                                    <div className="relative h-2.5 w-full rounded-full overflow-hidden bg-slate-200 dark:bg-slate-700">
+                                        <div
+                                            className="absolute inset-y-0 left-0 rounded-full bg-blue-600 transition-all duration-500 ease-out"
+                                            style={{ width: `${uploadProgress}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <Button variant="default" className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white" asChild>
+                                    <span>
                                         <Upload className="w-4 h-4 mr-2" />
-                                    )}
-                                    {uploading ? uploadMessage || "Processando..." : "Importar PDF"}
-                                </span>
-                            </Button>
+                                        Importar PDF
+                                    </span>
+                                </Button>
+                            )}
                         </label>
                     </div>
 
