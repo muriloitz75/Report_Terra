@@ -952,19 +952,18 @@ async def generate_report(
 
 @app.post("/api/shutdown")
 def shutdown_server():
-    """Shuts down the application server."""
-    import time
+    """Shuts down the backend server. The start.sh supervisor will restart it automatically."""
+    import signal
     import threading
-    import os
-    
-    # Run in a separate thread to allow response to be sent first
+
     def kill():
         time.sleep(1)
         logger.info("Shutting down server requested by user.")
-        os._exit(0)
-        
+        # Use SIGTERM for graceful shutdown - the supervisor in start.sh will restart us
+        os.kill(os.getpid(), signal.SIGTERM)
+
     threading.Thread(target=kill).start()
-    return {"message": "Desligando servidor..."}
+    return {"message": "Reiniciando servidor..."}
 
 
 # --- FEEDBACK SYSTEM ---

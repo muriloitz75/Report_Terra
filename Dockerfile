@@ -35,17 +35,13 @@ ENV LOG_LEVEL=INFO
 ENV NODE_ENV=production
 ENV BACKEND_API_URL=http://127.0.0.1:8000
 ENV AUTH_TRUST_HOST=true
-ENV AUTH_SECRET=your-secret-key-change-in-prod-or-generate-openssl-rand-base64-32
+# AUTH_SECRET deve ser passado via variável de ambiente no deploy (não hardcoded)
+# Ex: docker run -e AUTH_SECRET=sua-chave-secreta ...
+ENV AUTH_SECRET=""
 
-# Criar script de inicialização que inicia ambos os serviços
-RUN echo '#!/bin/sh' > /app/start.sh && \
-    echo 'echo "Iniciando backend na porta 8000..."' >> /app/start.sh && \
-    echo 'cd /app/backend && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 &' >> /app/start.sh && \
-    echo 'echo "Aguardando backend ficar pronto..."' >> /app/start.sh && \
-    echo 'until curl -sf http://127.0.0.1:8000/health > /dev/null 2>&1; do sleep 1; done' >> /app/start.sh && \
-    echo 'echo "Backend pronto! Iniciando frontend..."' >> /app/start.sh && \
-    echo 'cd /app/frontend/standalone && node server.js' >> /app/start.sh && \
-    chmod +x /app/start.sh
+# Criar script de inicialização com supervisão do backend
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
 # Expor porta do frontend (principal)
 EXPOSE 3000
