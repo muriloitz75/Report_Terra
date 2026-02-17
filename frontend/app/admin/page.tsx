@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Shield, Plus, Check, X, Loader2, UserX, RefreshCw, UserCheck } from 'lucide-react';
+import { Shield, Plus, Check, X, Loader2, UserX, RefreshCw, UserCheck, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { getAdminUsers, updateAdminUser, createAdminUser, deactivateAdminUser, AdminUser } from '@/lib/api';
+import { getAdminUsers, updateAdminUser, createAdminUser, deactivateAdminUser, deleteAdminUser, AdminUser } from '@/lib/api';
 
 export default function AdminPage() {
     const { data: session, status } = useSession();
@@ -106,6 +106,19 @@ export default function AdminPage() {
             setUsers(prev => prev.map(u => u.id === user.id ? { ...u, is_active: true } : u));
         } catch {
             setError('Erro ao reativar usuário.');
+        } finally {
+            setUpdatingId(null);
+        }
+    };
+
+    const handleDeleteUser = async (user: AdminUser) => {
+        if (!confirm(`ATENÇÃO: Excluir permanentemente o usuário ${user.email}?\n\nTodos os dados associados (processos, relatórios, atividades) serão removidos.\n\nEsta ação não pode ser desfeita.`)) return;
+        setUpdatingId(user.id);
+        try {
+            await deleteAdminUser(user.id);
+            setUsers(prev => prev.filter(u => u.id !== user.id));
+        } catch (e: any) {
+            setError(e?.response?.data?.detail || 'Erro ao excluir usuário.');
         } finally {
             setUpdatingId(null);
         }
@@ -317,25 +330,37 @@ export default function AdminPage() {
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 {user.email !== session?.user?.email && (
-                                                    user.is_active ? (
-                                                        <button
-                                                            onClick={() => handleDeactivate(user)}
-                                                            disabled={updatingId === user.id}
-                                                            className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50"
-                                                            title="Desativar usuário"
-                                                        >
-                                                            {updatingId === user.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserX className="w-4 h-4" />}
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => handleActivate(user)}
-                                                            disabled={updatingId === user.id}
-                                                            className="text-slate-400 hover:text-green-500 transition-colors disabled:opacity-50"
-                                                            title="Reativar usuário"
-                                                        >
-                                                            {updatingId === user.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
-                                                        </button>
-                                                    )
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        {user.is_active ? (
+                                                            <button
+                                                                onClick={() => handleDeactivate(user)}
+                                                                disabled={updatingId === user.id}
+                                                                className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                                                                title="Desativar usuário"
+                                                            >
+                                                                {updatingId === user.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserX className="w-4 h-4" />}
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => handleActivate(user)}
+                                                                disabled={updatingId === user.id}
+                                                                className="text-slate-400 hover:text-green-500 transition-colors disabled:opacity-50"
+                                                                title="Reativar usuário"
+                                                            >
+                                                                {updatingId === user.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+                                                            </button>
+                                                        )}
+                                                        {user.role !== 'admin' && (
+                                                            <button
+                                                                onClick={() => handleDeleteUser(user)}
+                                                                disabled={updatingId === user.id}
+                                                                className="text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                                                                title="Excluir permanentemente"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </td>
                                         </tr>

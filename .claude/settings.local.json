@@ -30,7 +30,10 @@
       "Bash(git commit:*)",
       "Bash(/c/Users/Murilo/Desktop/Projects/Report_Terra/.venv/Scripts/python:*)",
       "Bash(python3:*)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "Bash(node -e:*)",
+      "Bash(npx tsc:*)",
+      "Bash(# Verificar se o processo está mesmo rodando tasklist)"
     ]
   }
 }

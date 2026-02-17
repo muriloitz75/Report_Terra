@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { CircleAlert, Loader2 } from "lucide-react"
+import { CircleAlert, Loader2, WifiOff } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function LoginPage() {
@@ -15,6 +15,7 @@ export default function LoginPage() {
     const [password, setPassword] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [errorType, setErrorType] = useState<"auth" | "server">("auth")
     const router = useRouter()
 
     async function handleSubmit(e: React.FormEvent) {
@@ -23,20 +24,49 @@ export default function LoginPage() {
         setError(null)
 
         try {
+            // 1. Chamar o backend /token DIRETAMENTE do navegador (via Next.js rewrite)
+            //    Isso elimina o problema de chamada server-to-server do authorize
+            const tokenRes = await fetch("/token", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({ username: email, password }),
+                signal: AbortSignal.timeout(5000),
+            })
+
+            if (tokenRes.status === 401) {
+                setError("Email ou senha incorretos.")
+                setErrorType("auth")
+                setIsLoading(false)
+                return
+            }
+
+            if (!tokenRes.ok) {
+                setError("Erro no servidor. Tente novamente.")
+                setErrorType("server")
+                setIsLoading(false)
+                return
+            }
+
+            const tokenData = await tokenRes.json()
+
+            // 2. Token obtido com sucesso — criar sessão NextAuth passando o token já validado
             const result = await signIn("credentials", {
                 email,
-                password,
+                password: "__token__",
+                accessToken: tokenData.access_token,
                 redirect: false,
             })
 
             if (result?.error) {
-                setError("Email ou senha incorretos.")
+                setError("Erro ao criar sessão. Tente novamente.")
+                setErrorType("server")
             } else {
                 router.push("/")
                 router.refresh()
             }
-        } catch (err) {
-            setError("Ocorreu um erro ao tentar fazer login.")
+        } catch {
+            setError("Servidor indisponível. Aguarde o backend iniciar e tente novamente.")
+            setErrorType("server")
         } finally {
             setIsLoading(false)
         }
@@ -77,7 +107,10 @@ export default function LoginPage() {
 
                         {error && (
                             <Alert variant="destructive">
-                                <CircleAlert className="h-4 w-4" />
+                                {errorType === "server"
+                                    ? <WifiOff className="h-4 w-4" />
+                                    : <CircleAlert className="h-4 w-4" />
+                                }
                                 <AlertDescription>{error}</AlertDescription>
                             </Alert>
                         )}

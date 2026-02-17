@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getSession } from 'next-auth/react';
+import { getSession, signOut } from 'next-auth/react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -17,6 +17,17 @@ api.interceptors.request.use(
         return config;
     },
     (error) => {
+        return Promise.reject(error);
+    }
+);
+
+// Response interceptor: redirecionar ao login se o backend retornar 401
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        if (error.response?.status === 401 && typeof window !== 'undefined') {
+            await signOut({ redirect: true, callbackUrl: '/login' });
+        }
         return Promise.reject(error);
     }
 );
@@ -210,6 +221,11 @@ export const createAdminUser = async (data: {
 
 export const deactivateAdminUser = async (id: number): Promise<{ message: string }> => {
     const response = await api.delete(`/admin/users/${id}`);
+    return response.data;
+};
+
+export const deleteAdminUser = async (id: number): Promise<{ message: string }> => {
+    const response = await api.delete(`/admin/users/${id}/permanent`);
     return response.data;
 };
 

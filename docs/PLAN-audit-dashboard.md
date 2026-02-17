@@ -209,19 +209,19 @@ Em `frontend/components/app-sidebar.tsx`, adicionar item de menu:
 
 ### 3.1 Checklist de implementação
 
-- [ ] Modelo `UserActivity` criado em `models.py`
-- [ ] Campo `last_login` adicionado ao modelo `User`
-- [ ] `Base.metadata.create_all()` cria a tabela automaticamente
-- [ ] Endpoint `/token` registra login/login_failed com IP e User-Agent
-- [ ] `GET /admin/audit/summary` retorna KPIs
-- [ ] `GET /admin/audit/users` retorna atividade por usuário
-- [ ] `GET /admin/audit/activity?days=30` retorna série temporal
-- [ ] `GET /admin/audit/user/{user_id}/history` retorna log detalhado
-- [ ] Página `/admin/auditoria` com cards KPI
-- [ ] Gráfico de logins diários (últimos 30 dias)
-- [ ] Tabela de atividade por usuário com timestamp relativo
-- [ ] Link "Auditoria" na sidebar (admin only)
-- [ ] Funciona no Docker/Railway (sem dependências extras)
+- [x] Modelo `UserActivity` criado em `models.py`
+- [x] Campo `last_login` adicionado ao modelo `User`
+- [x] `Base.metadata.create_all()` cria a tabela automaticamente
+- [x] Endpoint `/token` registra login/login_failed com IP e User-Agent
+- [x] `GET /admin/audit/summary` retorna KPIs
+- [x] `GET /admin/audit/users` retorna atividade por usuário
+- [x] `GET /admin/audit/activity?days=30` retorna série temporal
+- [x] `GET /admin/audit/user/{user_id}/history` retorna log detalhado
+- [x] Página `/admin/auditoria` com cards KPI
+- [x] Gráfico de logins diários (últimos 30 dias)
+- [x] Tabela de atividade por usuário com timestamp relativo
+- [x] Link "Auditoria" na sidebar (admin only)
+- [x] Funciona no Docker/Railway (sem dependências extras)
 
 ### 3.2 Dependências
 

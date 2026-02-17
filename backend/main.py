@@ -852,6 +852,26 @@ def admin_deactivate_user(user_id: int, admin: User = Depends(get_admin_user), d
     db.commit()
     return {"message": f"Usuário {user.email} desativado"}
 
+@app.delete("/admin/users/{user_id}/permanent")
+def admin_delete_user(user_id: int, admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
+    """Exclui permanentemente um usuário e todos os seus dados associados."""
+    from models import UserActivity, Process
+    from models import Report
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    if user.id == admin.id:
+        raise HTTPException(status_code=400, detail="Não é possível excluir seu próprio usuário")
+    if user.role == "admin":
+        raise HTTPException(status_code=400, detail="Não é possível excluir outro administrador. Remova o papel de admin primeiro.")
+    email = user.email
+    db.query(UserActivity).filter(UserActivity.user_id == user_id).delete()
+    db.query(Report).filter(Report.user_id == user_id).delete()
+    db.query(Process).filter(Process.user_id == user_id).delete()
+    db.delete(user)
+    db.commit()
+    return {"message": f"Usuário {email} excluído permanentemente"}
+
 # --- ADMIN AUDIT ENDPOINTS ---
 
 @app.get("/admin/audit/summary")

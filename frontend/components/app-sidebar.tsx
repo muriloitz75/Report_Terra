@@ -19,16 +19,20 @@ export function AppSidebar() {
     const userInitial = userEmail.charAt(0).toUpperCase();
 
     const handleShutdown = async () => {
-        if (confirm("Deseja realmente encerrar a aplicação?")) {
-            setIsShutdown(true);
+        if (confirm("Deseja realmente sair da aplicação?")) {
+            // Fazer logout e fechar a janela (sem matar o backend)
             try {
-                // Dynamic import to avoid SSR issues
-                const { shutdownApp } = await import("@/lib/api");
-                await shutdownApp();
-            } catch (e) {
-                console.error(e);
+                await signOut({ redirect: false });
+            } catch {
+                // Fallback: limpar cookies manualmente
             }
-            // Try to close window
+            document.cookie.split(";").forEach((c) => {
+                const name = c.trim().split("=")[0];
+                if (name.includes("authjs") || name.includes("next-auth")) {
+                    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+                }
+            });
+            setIsShutdown(true);
             window.close();
         }
     };
@@ -178,18 +182,27 @@ export function AppSidebar() {
                             <LogOut className="w-8 h-8 text-red-500" />
                         </div>
                         <div>
-                            <h2 className="text-2xl font-bold mb-2">Aplicação Encerrada</h2>
+                            <h2 className="text-2xl font-bold mb-2">Sessão Encerrada</h2>
                             <p className="text-slate-400">
-                                O servidor foi desligado. Você pode fechar esta janela agora.
+                                Você saiu da aplicação. Feche esta janela ou faça login novamente.
                             </p>
                         </div>
-                        <Button
-                            variant="outline"
-                            onClick={() => window.close()}
-                            className="w-full text-slate-900 hover:text-slate-700 bg-white hover:bg-slate-100"
-                        >
-                            Fechar Janela
-                        </Button>
+                        <div className="flex gap-3 w-full">
+                            <Button
+                                variant="outline"
+                                onClick={() => window.location.href = "/login"}
+                                className="flex-1 text-slate-900 hover:text-slate-700 bg-white hover:bg-slate-100"
+                            >
+                                Fazer Login
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => window.close()}
+                                className="flex-1 text-slate-900 hover:text-slate-700 bg-white hover:bg-slate-100"
+                            >
+                                Fechar Janela
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}

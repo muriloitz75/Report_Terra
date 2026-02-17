@@ -1,80 +1,78 @@
-# PLAN.md - Evolution to Multi-User & Persistent Architecture
+# PLAN.md - Arquitetura Multi-Usuario
 
-> **Orchestrated by:** @[/orchestrate]
-> **Goal:** Transform Report Terra from a single-user MVP into a robust, multi-user SaaS-ready application.
-
----
-
-## 1. 🎯 Objectives
-
-1.  **Authentication & Authorization:**
-    -   Implement secure login (Email/Password or OAuth).
-    -   Secure Backend APIs with JWT (JSON Web Tokens).
-    -   Ensure users only access *their own* data.
-2.  **Robust Persistence:**
-    -   Migrate from `json` file to **PostgreSQL**.
-    -   Model relationships (Users -> Processes, Users -> Reports).
-3.  **Scalability & Safety:**
-    -   Protect routes and API endpoints.
-    -   Manage database migrations (Alembic).
+> **Status:** Implementado
+> **Objetivo:** Transformar Report Terra de MVP single-user em aplicacao multi-usuario com RBAC.
 
 ---
 
-## 2. 🏗️ Architecture Changes
+## 1. Objetivos (Concluidos)
 
-### Frontend (Next.js)
--   **Library:** `next-auth` (v5 beta or v4 stable).
--   **Flow:**
-    -   Login Page (`/login`).
-    -   Protected Routes (Middleware to redirect unauthenticated users).
-    -   Attach `Authorization: Bearer <token>` to all API requests (via Interceptor in `lib/api.ts`).
+1. **Autenticacao & Autorizacao:**
+    - Login Email/Senha via FastAPI `/token` (JWT HS256, 24h)
+    - NextAuth v5 (Credentials provider) gerencia sessao no frontend
+    - Interceptor Axios injeta token em todas as requisicoes
+    - Middleware protege rotas e redireciona sessoes expiradas
+
+2. **Persistencia:**
+    - SQLite via SQLAlchemy (migracoes manuais via Python sqlite3)
+    - Modelos: User, Process, Report, UserActivity
+
+3. **RBAC:**
+    - Papeis: `admin` e `user`
+    - Permissao granular: `can_generate_report` (boolean)
+    - Painel admin para gestao de usuarios
+
+---
+
+## 2. Arquitetura Implementada
+
+### Frontend (Next.js 16)
+- **NextAuth v5** (beta.30) com estrategia JWT
+- Login chama `/token` diretamente do navegador (via Next.js rewrite)
+- Token JWT passado ao `signIn()` - authorize apenas decodifica, sem fetch server-to-server
+- Middleware valida sessao e redireciona tokens expirados
+- `publicPaths`: `/login`, `/api/auth`, `/token`, `/health`
 
 ### Backend (FastAPI)
--   **Database:** PostgreSQL (via `SQLAlchemy` + `AsyncPG`).
--   **Auth:** `OAuth2PasswordBearer` flow.
--   **Hashing:** `Passlib[bcrypt]`.
--   **Schema:**
-    -   `users` (id, email, hashed_password, created_at)
-    -   `processes` (id, user_id, status, details...)
-    -   `reports` (id, user_id, content, feedback...)
+- **Banco:** SQLite (`backend/data/report_terra.db`)
+- **Auth:** `OAuth2PasswordBearer` + `passlib[bcrypt]` + `python-jose`
+- **Modelos:** User, Process, Report, UserActivity
 
 ---
 
-## 3. 📅 Implementation Phases (Sequential)
+## 3. Fases de Implementacao
 
-### Phase 1: Foundation (Database) 🛠️
-*Agent: `database-architect`*
-1.  Setup PostgreSQL (Docker or local).
-2.  Define SQLAlchemy Models (`User`, `Process`, `Report`).
-3.  Config Alembic for migrations.
-4.  Created initial migration script.
+### Fase 1: Banco de Dados - CONCLUIDA
+- [x] Modelos SQLAlchemy (User, Process, Report)
+- [x] SQLite como banco (decisao: simplicidade, sem Docker extra)
+- [x] `Base.metadata.create_all()` cria tabelas no startup
 
-### Phase 2: Backend Authentication 🛡️
-*Agent: `security-auditor` & `backend-specialist`*
-1.  Implement `auth.py` (JWT encoding/decoding).
-2.  Create endpoints: `/auth/register`, `/auth/login`.
-3.  Protect dependency `get_current_user` to validate JWT.
-4.  Update all endpoints to use the *real* `user_id` from the token.
+### Fase 2: Autenticacao Backend - CONCLUIDA
+- [x] `auth.py` com JWT encoding/decoding (HS256)
+- [x] Endpoint `/token` com OAuth2PasswordRequestForm
+- [x] Dependencia `get_current_user` para proteger endpoints
+- [x] Endpoints filtram dados por `user_id` do token
 
-### Phase 3: Frontend Integration 💻
-*Agent: `frontend-specialist`*
-1.  Setup `NextAuth.js` provider.
-2.  Create Login/Register UI pages.
-3.  Update `lib/api.ts` to inject tokens.
-4.  Add Route Guards (Middleware).
+### Fase 3: Integracao Frontend - CONCLUIDA
+- [x] NextAuth v5 configurado com Credentials provider
+- [x] Login page chama `/token` direto do browser (via rewrite)
+- [x] `lib/api.ts` com interceptor de token e redirect 401
+- [x] Middleware protege todas as rotas (exceto publicas)
 
-### Phase 4: Migration & Verification ✅
-*Agent: `test-engineer`*
-1.  Migrate existing JSON data to DB (script).
-2.  Run Security Scan (`security_scan.py`).
-3.  Test E2E flow (Login -> Upload -> Logout).
+### Fase 4: Painel Admin - CONCLUIDA
+- [x] CRUD de usuarios (`/admin/users`)
+- [x] Dashboard de auditoria (`/admin/auditoria`)
+- [x] Registro de atividade (login/login_failed) com IP e User-Agent
+- [x] KPIs, serie temporal e historico por usuario
 
 ---
 
-## 4. 📝 User Review Required
--   **Technology Choice:** PostgreSQL is recommended for production, but SQLite is easier for local dev. **Decision:** We will use **SQLite** initially for simplicity (no extra Docker container needed), compatible with SQLAlchemy (easy switch to Postgres later).
--   **Auth Provider:** We will use standard Email/Password implementation in FastAPI to avoid external dependencies (like Auth0) for now.
+## 4. Decisoes de Design
 
----
-
-**Next Step:** Approve this plan to begin Phase 1.
+| Decisao | Escolha | Motivo |
+|---------|---------|--------|
+| Banco | SQLite | Simplicidade, sem dependencia extra, compativel com SQLAlchemy |
+| Auth provider | Email/Senha proprio | Sem dependencias externas (Auth0, etc.) |
+| Migracoes | Scripts Python manuais | Alembic nao instalado; tabelas criadas via `create_all()` |
+| Auth flow | Client-side fetch + rewrite | Evita problemas de fetch server-to-server no NextAuth authorize |
+| Sessao NextAuth | JWT (8h maxAge) | Stateless, sem necessidade de banco de sessoes |

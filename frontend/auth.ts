@@ -11,18 +11,6 @@ function decodeJWTPayload(token: string): Record<string, any> {
     }
 }
 
-// URL do backend para uso no servidor (NextAuth roda no servidor)
-// Em produção Docker, o backend está em localhost:8000
-// Em desenvolvimento, usa NEXT_PUBLIC_API_URL ou localhost:8000
-const getBackendUrl = () => {
-    if (typeof window !== 'undefined') {
-        // No cliente, usa URL relativa (proxy via Next.js rewrites)
-        return '';
-    }
-    // No servidor, usa a URL direta do backend
-    return process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-};
-
 export const { handlers, signIn, signOut, auth } = NextAuth({
     session: {
         strategy: "jwt",
@@ -33,42 +21,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             credentials: {
                 email: {},
                 password: {},
+                accessToken: {},
             },
             authorize: async (credentials) => {
-                try {
-                    const backendUrl = getBackendUrl();
-                    console.log(`[Auth] Attempting login for ${credentials.email} via ${backendUrl}/token`);
-                    const res = await fetch(`${backendUrl}/token`, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/x-www-form-urlencoded",
-                        },
-                        body: new URLSearchParams({
-                            username: credentials.email as string,
-                            password: credentials.password as string,
-                        }),
-                    })
+                // O login page já validou as credenciais diretamente com o backend
+                // e nos passa o accessToken já obtido. Aqui só decodificamos.
+                const accessToken = credentials.accessToken as string | undefined
+                if (!accessToken) return null
 
-                    if (!res.ok) {
-                        console.log(`[Auth] Backend returned ${res.status}: invalid credentials`);
-                        return null
-                    }
+                const payload = decodeJWTPayload(accessToken)
+                if (!payload.sub) return null
 
-                    const data = await res.json()
-                    const payload = decodeJWTPayload(data.access_token);
-
-                    console.log(`[Auth] Login successful for ${credentials.email}`);
-                    // Return user object compatible with NextAuth
-                    return {
-                        id: credentials.email as string,
-                        email: credentials.email as string,
-                        accessToken: data.access_token,
-                        role: payload.role || 'user',
-                        canGenerateReport: payload.can_generate_report || false,
-                    }
-                } catch (error) {
-                    console.error(`[Auth] Connection error to backend:`, error);
-                    return null
+                return {
+                    id: payload.sub,
+                    email: payload.sub,
+                    accessToken,
+                    role: payload.role || 'user',
+                    canGenerateReport: payload.can_generate_report || false,
                 }
             },
         }),
@@ -80,9 +49,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.role = (user as any).role
                 token.canGenerateReport = (user as any).canGenerateReport
             }
+            // Validar se o token do backend ainda é válido
+            if (token.accessToken) {
+                try {
+                    const payload = decodeJWTPayload(token.accessToken as string)
+                    if (payload.exp && payload.exp * 1000 < Date.now()) {
+                        return { ...token, accessToken: null }
+                    }
+                } catch {
+                    return { ...token, accessToken: null }
+                }
+            }
             return token
         },
         async session({ session, token }) {
+            if (!token.accessToken) {
+                return { ...session, expired: true }
+            }
             (session as any).accessToken = token.accessToken
             ;(session as any).role = token.role
             ;(session as any).canGenerateReport = token.canGenerateReport
@@ -92,12 +75,5 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     pages: {
         signIn: "/login",
     },
-    // Garante que a sessão seja invalidada corretamente no logout
-    events: {
-        async signOut() {
-            // Limpa qualquer estado de sessão residual
-        },
-    },
-    // Configuração para evitar cache de sessão
     trustHost: true,
 })

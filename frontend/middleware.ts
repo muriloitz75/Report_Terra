@@ -1,15 +1,12 @@
 import { auth } from "@/auth"
 
-export default auth((req: any) => { // Type 'any' for now to potential type conflicts in beta
-    console.log("[Middleware] Processing request:", req.nextUrl.pathname);
-    console.log("[Middleware] Auth state:", req.auth ? "authenticated" : "not authenticated");
-    
-    // Rotas públicas que não precisam de autenticação
-    const publicPaths = ["/login", "/api/auth"];
+export default auth((req: any) => {
+    const publicPaths = ["/login", "/api/auth", "/token", "/health"];
     const isPublicPath = publicPaths.some(path => req.nextUrl.pathname.startsWith(path));
-    
-    if (!req.auth && !isPublicPath) {
-        console.log("[Middleware] Redirecting to /login");
+
+    // Redirecionar para login se: sem sessão, ou sessão expirada (sem accessToken)
+    const isExpired = req.auth && (req.auth as any).expired === true
+    if ((!req.auth || isExpired) && !isPublicPath) {
         const newUrl = new URL("/login", req.nextUrl.origin)
         return Response.redirect(newUrl)
     }
