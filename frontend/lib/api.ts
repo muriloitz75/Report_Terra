@@ -193,6 +193,7 @@ export interface AdminUser {
     role: string;
     can_generate_report: boolean;
     is_active: boolean;
+    approval_status?: "pending" | "approved" | "rejected";
     created_at: string;
 }
 
@@ -203,20 +204,9 @@ export const getAdminUsers = async (): Promise<AdminUser[]> => {
 
 export const updateAdminUser = async (
     id: number,
-    data: Partial<Pick<AdminUser, 'role' | 'can_generate_report' | 'is_active'>>
+    data: Partial<Pick<AdminUser, 'role' | 'can_generate_report' | 'is_active' | 'approval_status'>>
 ): Promise<AdminUser> => {
     const response = await api.patch(`/admin/users/${id}`, data);
-    return response.data;
-};
-
-export const createAdminUser = async (data: {
-    email: string;
-    password: string;
-    full_name?: string;
-    role?: string;
-    can_generate_report?: boolean;
-}): Promise<AdminUser> => {
-    const response = await api.post('/admin/users', data);
     return response.data;
 };
 

@@ -15,6 +15,7 @@ class User(Base):
     role = Column(String, default="user")  # "admin" or "user"
     can_generate_report = Column(Boolean, default=False)
     last_login = Column(DateTime, nullable=True)
+    approval_status = Column(String, default="approved")
 
     processes = relationship("Process", back_populates="owner")
     reports = relationship("Report", back_populates="owner")

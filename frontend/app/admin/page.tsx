@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Shield, Plus, Check, X, Loader2, UserX, RefreshCw, UserCheck, Trash2 } from 'lucide-react';
+import { Shield, Check, X, Loader2, UserX, RefreshCw, UserCheck, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { getAdminUsers, updateAdminUser, createAdminUser, deactivateAdminUser, deleteAdminUser, AdminUser } from '@/lib/api';
+import { getAdminUsers, updateAdminUser, deactivateAdminUser, deleteAdminUser, AdminUser } from '@/lib/api';
 
 export default function AdminPage() {
     const { data: session, status } = useSession();
@@ -16,17 +16,7 @@ export default function AdminPage() {
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [showCreateForm, setShowCreateForm] = useState(false);
-    const [creating, setCreating] = useState(false);
     const [updatingId, setUpdatingId] = useState<number | null>(null);
-
-    const [newUser, setNewUser] = useState({
-        email: '',
-        password: '',
-        full_name: '',
-        role: 'user',
-        can_generate_report: false,
-    });
 
     useEffect(() => {
         if (status === 'loading') return;
@@ -124,19 +114,31 @@ export default function AdminPage() {
         }
     };
 
-    const handleCreateUser = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setCreating(true);
-        setError('');
+    const pendingUsers = users.filter(u => (u.approval_status || 'approved') === 'pending');
+
+    const handleApprove = async (user: AdminUser) => {
+        if (!confirm(`Aprovar o cadastro de ${user.email}?`)) return;
+        setUpdatingId(user.id);
         try {
-            const created = await createAdminUser(newUser);
-            setUsers(prev => [...prev, { ...created, is_active: true, created_at: new Date().toISOString(), full_name: newUser.full_name || undefined }]);
-            setNewUser({ email: '', password: '', full_name: '', role: 'user', can_generate_report: false });
-            setShowCreateForm(false);
+            const updated = await updateAdminUser(user.id, { approval_status: 'approved', is_active: true });
+            setUsers(prev => prev.map(u => u.id === user.id ? { ...u, ...updated } : u));
         } catch (e: any) {
-            setError(e?.response?.data?.detail || 'Erro ao criar usuário.');
+            setError(e?.response?.data?.detail || 'Erro ao aprovar usuário.');
         } finally {
-            setCreating(false);
+            setUpdatingId(null);
+        }
+    };
+
+    const handleReject = async (user: AdminUser) => {
+        if (!confirm(`Reprovar o cadastro de ${user.email}?`)) return;
+        setUpdatingId(user.id);
+        try {
+            const updated = await updateAdminUser(user.id, { approval_status: 'rejected', is_active: false });
+            setUsers(prev => prev.map(u => u.id === user.id ? { ...u, ...updated } : u));
+        } catch (e: any) {
+            setError(e?.response?.data?.detail || 'Erro ao reprovar usuário.');
+        } finally {
+            setUpdatingId(null);
         }
     };
 
@@ -166,10 +168,6 @@ export default function AdminPage() {
                         <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                         Atualizar
                     </Button>
-                    <Button size="sm" onClick={() => setShowCreateForm(!showCreateForm)} className="bg-amber-600 hover:bg-amber-700 text-white">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Novo Usuário
-                    </Button>
                 </div>
             </div>
 
@@ -181,78 +179,42 @@ export default function AdminPage() {
                 </div>
             )}
 
-            {/* Create User Form */}
-            {showCreateForm && (
+            {pendingUsers.length > 0 && (
                 <Card className="border-amber-200 dark:border-amber-800">
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-base">Criar Novo Usuário</CardTitle>
+                        <CardTitle className="text-base">Solicitações de Cadastro ({pendingUsers.length})</CardTitle>
+                        <CardDescription className="text-xs">Aprove ou reprove novos usuários.</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <form onSubmit={handleCreateUser} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Email *</label>
-                                <input
-                                    type="email"
-                                    required
-                                    value={newUser.email}
-                                    onChange={e => setNewUser(p => ({ ...p, email: e.target.value }))}
-                                    className="w-full px-3 py-2 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                    placeholder="usuario@exemplo.com"
-                                />
+                    <CardContent className="space-y-2">
+                        {pendingUsers.map(user => (
+                            <div key={user.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                                <div className="min-w-0">
+                                    <p className="font-medium text-slate-800 dark:text-slate-100 truncate">{user.email}</p>
+                                    <p className="text-xs text-slate-500 truncate">{user.full_name || "Sem nome"}</p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <Button
+                                        size="sm"
+                                        className="bg-green-600 hover:bg-green-700 text-white"
+                                        onClick={() => handleApprove(user)}
+                                        disabled={updatingId === user.id}
+                                    >
+                                        {updatingId === user.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+                                        Aprovar
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-red-200 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-900/20"
+                                        onClick={() => handleReject(user)}
+                                        disabled={updatingId === user.id}
+                                    >
+                                        <X className="w-4 h-4 mr-2" />
+                                        Reprovar
+                                    </Button>
+                                </div>
                             </div>
-                            <div className="space-y-1">
-                                <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Senha *</label>
-                                <input
-                                    type="password"
-                                    required
-                                    value={newUser.password}
-                                    onChange={e => setNewUser(p => ({ ...p, password: e.target.value }))}
-                                    className="w-full px-3 py-2 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                    placeholder="Senha"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Nome Completo</label>
-                                <input
-                                    type="text"
-                                    value={newUser.full_name}
-                                    onChange={e => setNewUser(p => ({ ...p, full_name: e.target.value }))}
-                                    className="w-full px-3 py-2 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                    placeholder="Nome do usuário"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Papel</label>
-                                <select
-                                    value={newUser.role}
-                                    onChange={e => setNewUser(p => ({ ...p, role: e.target.value }))}
-                                    className="w-full px-3 py-2 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                >
-                                    <option value="user">Usuário</option>
-                                    <option value="admin">Administrador</option>
-                                </select>
-                            </div>
-                            <div className="flex items-center gap-3 sm:col-span-2">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={newUser.can_generate_report}
-                                        onChange={e => setNewUser(p => ({ ...p, can_generate_report: e.target.checked }))}
-                                        className="w-4 h-4 rounded border-slate-300"
-                                    />
-                                    <span className="text-sm text-slate-700 dark:text-slate-300">Permitir geração de relatórios IA</span>
-                                </label>
-                            </div>
-                            <div className="sm:col-span-2 flex gap-2 justify-end pt-2">
-                                <Button type="button" variant="outline" size="sm" onClick={() => setShowCreateForm(false)}>
-                                    Cancelar
-                                </Button>
-                                <Button type="submit" size="sm" disabled={creating} className="bg-amber-600 hover:bg-amber-700 text-white">
-                                    {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                                    Criar Usuário
-                                </Button>
-                            </div>
-                        </form>
+                        ))}
                     </CardContent>
                 </Card>
             )}
@@ -320,13 +282,23 @@ export default function AdminPage() {
                                                 </button>
                                             </td>
                                             <td className="px-4 py-3 text-center">
-                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                    user.is_active
-                                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500'
-                                                }`}>
-                                                    {user.is_active ? 'Ativo' : 'Inativo'}
-                                                </span>
+                                                {((user.approval_status || 'approved') === 'pending') ? (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                                        Pendente
+                                                    </span>
+                                                ) : ((user.approval_status || 'approved') === 'rejected') ? (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                                        Reprovado
+                                                    </span>
+                                                ) : (
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                        user.is_active
+                                                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                            : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500'
+                                                    }`}>
+                                                        {user.is_active ? 'Ativo' : 'Inativo'}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 {user.email !== session?.user?.email && (

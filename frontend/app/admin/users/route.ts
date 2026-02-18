@@ -1,0 +1,44 @@
+function getBackendUrl(pathname: string, search: string) {
+    const base = process.env.BACKEND_API_URL || "http://127.0.0.1:8000"
+    return `${base}${pathname}${search || ""}`
+}
+
+async function proxy(req: Request, pathname: string) {
+    const url = new URL(req.url)
+    const targetUrl = getBackendUrl(pathname, url.search)
+
+    const headers = new Headers(req.headers)
+    headers.delete("host")
+
+    const init: RequestInit = {
+        method: req.method,
+        headers,
+        cache: "no-store",
+    }
+
+    if (req.method !== "GET" && req.method !== "HEAD") {
+        init.body = await req.arrayBuffer()
+    }
+
+    const res = await fetch(targetUrl, init)
+    const resHeaders = new Headers(res.headers)
+    resHeaders.delete("content-encoding")
+    resHeaders.delete("content-length")
+
+    return new Response(res.body, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: resHeaders,
+    })
+}
+
+export async function GET(req: Request) {
+    return proxy(req, "/admin/users")
+}
+
+export async function POST() {
+    return new Response(JSON.stringify({ detail: "Método não permitido" }), {
+        status: 405,
+        headers: { "Content-Type": "application/json" },
+    })
+}

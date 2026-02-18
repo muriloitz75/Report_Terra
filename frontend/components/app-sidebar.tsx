@@ -15,8 +15,8 @@ export function AppSidebar() {
     const { data: session } = useSession();
 
     const isAdmin = (session as any)?.role === "admin";
-    const userEmail = session?.user?.email || "Usuário";
-    const userInitial = userEmail.charAt(0).toUpperCase();
+    const userName = session?.user?.name || session?.user?.email || "Usuário";
+    const userInitial = userName.charAt(0).toUpperCase();
 
     const handleShutdown = async () => {
         if (confirm("Deseja realmente sair da aplicação?")) {
@@ -131,7 +131,7 @@ export function AppSidebar() {
                                     <span className="text-xs font-bold">{userInitial}</span>
                                 </div>
                                 <div className={`flex flex-col transition-opacity duration-300 whitespace-nowrap ${!isHovered && "md:opacity-0 md:w-0 md:hidden"}`}>
-                                    <span className="text-xs font-medium text-slate-200 max-w-[120px] truncate">{userEmail}</span>
+                                    <span className="text-xs font-medium text-slate-200 max-w-[120px] truncate">{userName}</span>
                                     <span className="text-[10px] text-slate-500">{isAdmin ? "Administrador" : "Usuário"}</span>
                                 </div>
                             </div>

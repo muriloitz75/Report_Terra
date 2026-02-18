@@ -35,6 +35,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 return {
                     id: payload.sub,
                     email: payload.sub,
+                    name: payload.full_name || payload.name || payload.sub,
                     accessToken,
                     role: payload.role || 'user',
                     canGenerateReport: payload.can_generate_report || false,
@@ -48,6 +49,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.accessToken = (user as any).accessToken
                 token.role = (user as any).role
                 token.canGenerateReport = (user as any).canGenerateReport
+                token.name = (user as any).name
             }
             // Validar se o token do backend ainda é válido
             if (token.accessToken) {
@@ -69,6 +71,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             (session as any).accessToken = token.accessToken
             ;(session as any).role = token.role
             ;(session as any).canGenerateReport = token.canGenerateReport
+            session.user = session.user || ({} as any)
+            session.user.name = (token as any).name || session.user.name || session.user.email
             return session
         },
     },

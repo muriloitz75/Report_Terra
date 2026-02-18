@@ -75,6 +75,16 @@ try:
 except Exception:
     pass  # Column already exists
 
+# Migrate: add approval_status column to users if missing
+try:
+    from sqlalchemy import text as sa_text
+    with engine.connect() as conn:
+        conn.execute(sa_text("ALTER TABLE users ADD COLUMN approval_status VARCHAR DEFAULT 'approved'"))
+        conn.execute(sa_text("UPDATE users SET approval_status = 'approved' WHERE approval_status IS NULL OR approval_status = ''"))
+        conn.commit()
+except Exception:
+    pass
+
 # Migrate: change processes PK to autoincrement integer and make (user_id, id) unique
 try:
     from sqlalchemy import text as sa_text
@@ -189,6 +199,14 @@ async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequ
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    approval_status = getattr(user, "approval_status", "approved") or "approved"
+    if approval_status == "pending":
+        raise HTTPException(status_code=403, detail="Cadastro pendente de aprovação")
+    if approval_status == "rejected":
+        raise HTTPException(status_code=403, detail="Cadastro reprovado")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Usuário desativado")
+
     # Registrar login bem-sucedido
     user.last_login = datetime.utcnow()
     db.add(UserActivity(user_id=user.id, action="login", ip_address=ip_address, user_agent=user_agent))
@@ -199,6 +217,7 @@ async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequ
         data={
             "sub": user.email,
             "id": user.id,
+            "full_name": user.full_name,
             "role": getattr(user, 'role', 'user'),
             "can_generate_report": getattr(user, 'can_generate_report', False),
         },
@@ -220,11 +239,17 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Email already registered")
     
     hashed_password = auth.get_password_hash(user.password)
-    new_user = User(email=user.email, hashed_password=hashed_password, full_name=user.full_name)
+    new_user = User(
+        email=user.email,
+        hashed_password=hashed_password,
+        full_name=user.full_name,
+        is_active=False,
+        approval_status="pending",
+    )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return {"id": new_user.id, "email": new_user.email, "message": "User created successfully"}
+    return {"id": new_user.id, "email": new_user.email, "message": "Cadastro solicitado. Aguarde aprovação do administrador."}
 
 # In-memory DB fallback for legacy code (will be removed later)
 # DB: Dict[str, List[Dict[str, Any]]] = {}
@@ -871,13 +896,7 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     can_generate_report: Optional[bool] = None
     is_active: Optional[bool] = None
-
-class AdminUserCreate(BaseModel):
-    email: str
-    password: str
-    full_name: Optional[str] = None
-    role: str = "user"
-    can_generate_report: bool = False
+    approval_status: Optional[str] = None
 
 @app.get("/admin/users")
 def admin_list_users(admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
@@ -890,6 +909,7 @@ def admin_list_users(admin: User = Depends(get_admin_user), db: Session = Depend
             "role": getattr(u, 'role', 'user'),
             "can_generate_report": bool(getattr(u, 'can_generate_report', False)),
             "is_active": u.is_active,
+            "approval_status": getattr(u, "approval_status", "approved") or "approved",
             "created_at": u.created_at.isoformat() if u.created_at else None,
         }
         for u in users
@@ -906,33 +926,22 @@ def admin_update_user(user_id: int, update: UserUpdate, admin: User = Depends(ge
         user.can_generate_report = update.can_generate_report
     if update.is_active is not None:
         user.is_active = update.is_active
+    if update.approval_status is not None:
+        if update.approval_status not in ["pending", "approved", "rejected"]:
+            raise HTTPException(status_code=400, detail="approval_status inválido")
+        user.approval_status = update.approval_status
     db.commit()
     db.refresh(user)
     return {
         "id": user.id,
         "email": user.email,
+        "full_name": user.full_name,
         "role": getattr(user, 'role', 'user'),
         "can_generate_report": bool(getattr(user, 'can_generate_report', False)),
         "is_active": user.is_active,
+        "approval_status": getattr(user, "approval_status", "approved") or "approved",
+        "created_at": user.created_at.isoformat() if user.created_at else None,
     }
-
-@app.post("/admin/users")
-def admin_create_user(user_data: AdminUserCreate, admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.email == user_data.email).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Email já cadastrado")
-    hashed_password = auth.get_password_hash(user_data.password)
-    new_user = User(
-        email=user_data.email,
-        hashed_password=hashed_password,
-        full_name=user_data.full_name,
-        role=user_data.role,
-        can_generate_report=user_data.can_generate_report,
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    return {"id": new_user.id, "email": new_user.email, "role": new_user.role, "can_generate_report": new_user.can_generate_report}
 
 @app.delete("/admin/users/{user_id}")
 def admin_deactivate_user(user_id: int, admin: User = Depends(get_admin_user), db: Session = Depends(get_db)):

@@ -1,85 +1,63 @@
 "use client"
 
 import { useState } from "react"
-import { signIn } from "next-auth/react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { CircleAlert, Loader2, WifiOff } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { CircleAlert, Loader2 } from "lucide-react"
 
-export default function LoginPage() {
+export default function CadastroPage() {
+    const [fullName, setFullName] = useState("")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
+    const [confirmPassword, setConfirmPassword] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [errorType, setErrorType] = useState<"auth" | "server">("auth")
-    const router = useRouter()
+    const [success, setSuccess] = useState<string | null>(null)
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
-        setIsLoading(true)
         setError(null)
+        setSuccess(null)
 
+        if (password !== confirmPassword) {
+            setError("As senhas não coincidem.")
+            return
+        }
+
+        setIsLoading(true)
         try {
-            // 1. Chamar o backend /token DIRETAMENTE do navegador (via Next.js rewrite)
-            //    Isso elimina o problema de chamada server-to-server do authorize
-            const tokenRes = await fetch("/token", {
+            const res = await fetch("/auth/register", {
                 method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: new URLSearchParams({ username: email, password }),
-                signal: AbortSignal.timeout(5000),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email,
+                    password,
+                    full_name: fullName || null,
+                }),
             })
 
-            if (tokenRes.status === 401) {
-                setError("Email ou senha incorretos.")
-                setErrorType("auth")
-                setIsLoading(false)
-                return
-            }
-
-            if (tokenRes.status === 403) {
-                let detail = "Acesso não autorizado."
+            if (!res.ok) {
+                let detail = "Não foi possível solicitar o cadastro."
                 try {
-                    const data = await tokenRes.json()
+                    const data = await res.json()
                     if (data?.detail) detail = data.detail
                 } catch { }
                 setError(detail)
-                setErrorType("auth")
-                setIsLoading(false)
                 return
             }
 
-            if (!tokenRes.ok) {
-                setError("Erro no servidor. Tente novamente.")
-                setErrorType("server")
-                setIsLoading(false)
-                return
-            }
-
-            const tokenData = await tokenRes.json()
-
-            // 2. Token obtido com sucesso — criar sessão NextAuth passando o token já validado
-            const result = await signIn("credentials", {
-                email,
-                password: "__token__",
-                accessToken: tokenData.access_token,
-                redirect: false,
-            })
-
-            if (result?.error) {
-                setError("Erro ao criar sessão. Tente novamente.")
-                setErrorType("server")
-            } else {
-                router.push("/")
-                router.refresh()
-            }
+            const data = await res.json().catch(() => null)
+            setSuccess(data?.message || "Cadastro solicitado. Aguarde aprovação do administrador.")
+            setFullName("")
+            setEmail("")
+            setPassword("")
+            setConfirmPassword("")
         } catch {
-            setError("Servidor indisponível. Aguarde o backend iniciar e tente novamente.")
-            setErrorType("server")
+            setError("Erro de conexão. Tente novamente.")
         } finally {
             setIsLoading(false)
         }
@@ -89,13 +67,23 @@ export default function LoginPage() {
         <div className="flex min-h-screen items-center justify-center bg-gray-100 dark:bg-gray-900 p-4">
             <Card className="w-full max-w-md">
                 <CardHeader className="space-y-1">
-                    <CardTitle className="text-2xl font-bold text-center">Report Terra</CardTitle>
+                    <CardTitle className="text-2xl font-bold text-center">Solicitar Cadastro</CardTitle>
                     <CardDescription className="text-center">
-                        Entre com suas credenciais para acessar o sistema
+                        Preencha os dados. Um administrador precisa aprovar seu acesso.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="full_name">Nome completo</Label>
+                            <Input
+                                id="full_name"
+                                type="text"
+                                placeholder="Seu nome"
+                                value={fullName}
+                                onChange={(e) => setFullName(e.target.value)}
+                            />
+                        </div>
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
                             <Input
@@ -117,14 +105,27 @@ export default function LoginPage() {
                                 required
                             />
                         </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="confirm_password">Confirmar senha</Label>
+                            <Input
+                                id="confirm_password"
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                required
+                            />
+                        </div>
 
                         {error && (
                             <Alert variant="destructive">
-                                {errorType === "server"
-                                    ? <WifiOff className="h-4 w-4" />
-                                    : <CircleAlert className="h-4 w-4" />
-                                }
+                                <CircleAlert className="h-4 w-4" />
                                 <AlertDescription>{error}</AlertDescription>
+                            </Alert>
+                        )}
+
+                        {success && (
+                            <Alert className="border-green-200 text-green-700 dark:border-green-900 dark:text-green-400">
+                                <AlertDescription>{success}</AlertDescription>
                             </Alert>
                         )}
 
@@ -132,19 +133,19 @@ export default function LoginPage() {
                             {isLoading ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Entrando...
+                                    Enviando...
                                 </>
                             ) : (
-                                "Entrar"
+                                "Enviar solicitação"
                             )}
                         </Button>
                     </form>
                 </CardContent>
                 <CardFooter className="flex justify-center text-sm text-gray-500">
                     <p>
-                        Não tem conta?{" "}
-                        <Link href="/cadastro" className="text-blue-600 hover:underline">
-                            Solicite cadastro
+                        Já tem conta?{" "}
+                        <Link href="/login" className="text-blue-600 hover:underline">
+                            Voltar ao login
                         </Link>
                     </p>
                 </CardFooter>
@@ -152,3 +153,4 @@ export default function LoginPage() {
         </div>
     )
 }
+
