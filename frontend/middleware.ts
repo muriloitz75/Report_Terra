@@ -8,12 +8,11 @@ export default auth((req: any) => {
     // Redirecionar para login se: sem sessão, ou sessão expirada (sem accessToken)
     const isExpired = req.auth && (req.auth as any).expired === true
     if ((!req.auth || isExpired) && !isPublicPath) {
-        return new NextResponse(null, {
-            status: 307,
-            headers: {
-                Location: "/login",
-            },
-        })
+        const proto = req.headers.get("x-forwarded-proto") || "https"
+        const host = req.headers.get("x-forwarded-host") || req.headers.get("host")
+        const base = host ? `${proto}://${host}` : req.nextUrl.origin
+        const url = new URL("/login", base)
+        return NextResponse.redirect(url)
     }
 })
 
