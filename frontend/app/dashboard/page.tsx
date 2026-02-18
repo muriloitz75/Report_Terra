@@ -201,6 +201,46 @@ function DashboardContent() {
                             </CardContent>
                         </Card>
                     )}
+
+                    {stats.by_type_closed_top && stats.by_type_closed_top.length > 0 && (
+                        <Card className="shadow-sm">
+                            <CardHeader>
+                                <CardTitle className="text-emerald-700">Ranking: Mais Encerrados</CardTitle>
+                                <CardDescription>Top 10 tipos com mais encerramentos</CardDescription>
+                            </CardHeader>
+                            <CardContent className="h-[350px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={stats.by_type_closed_top} layout="vertical" margin={{ left: 40 }}>
+                                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} horizontal={true} vertical={false} />
+                                        <XAxis type="number" fontSize={12} />
+                                        <YAxis dataKey="type" type="category" width={180} fontSize={11} tickFormatter={(val) => val.length > 30 ? val.substring(0, 30) + '...' : val} />
+                                        <Tooltip cursor={{ fill: 'transparent' }} />
+                                        <Bar dataKey="count" name="Encerrados" fill="#16a34a" radius={[0, 4, 4, 0]} barSize={20} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {stats.by_type_closed_bottom && stats.by_type_closed_bottom.length > 0 && (
+                        <Card className="shadow-sm">
+                            <CardHeader>
+                                <CardTitle className="text-slate-700">Ranking: Menos Encerrados</CardTitle>
+                                <CardDescription>Top 10 tipos com menos encerramentos</CardDescription>
+                            </CardHeader>
+                            <CardContent className="h-[350px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={stats.by_type_closed_bottom} layout="vertical" margin={{ left: 40 }}>
+                                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} horizontal={true} vertical={false} />
+                                        <XAxis type="number" fontSize={12} />
+                                        <YAxis dataKey="type" type="category" width={180} fontSize={11} tickFormatter={(val) => val.length > 30 ? val.substring(0, 30) + '...' : val} />
+                                        <Tooltip cursor={{ fill: 'transparent' }} />
+                                        <Bar dataKey="count" name="Encerrados" fill="#64748b" radius={[0, 4, 4, 0]} barSize={20} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
             )}
         </div>

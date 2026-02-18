@@ -20,20 +20,7 @@ export function AppSidebar() {
 
     const handleShutdown = async () => {
         if (confirm("Deseja realmente sair da aplicação?")) {
-            // Fazer logout e fechar a janela (sem matar o backend)
-            try {
-                await signOut({ redirect: false });
-            } catch {
-                // Fallback: limpar cookies manualmente
-            }
-            document.cookie.split(";").forEach((c) => {
-                const name = c.trim().split("=")[0];
-                if (name.includes("authjs") || name.includes("next-auth")) {
-                    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-                }
-            });
-            setIsShutdown(true);
-            window.close();
+            await signOut({ redirect: true, callbackUrl: "/login" });
         }
     };
 

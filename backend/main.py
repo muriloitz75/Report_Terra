@@ -33,7 +33,11 @@ if log_level_str not in valid_levels:
 log_level = log_level_str
 logging.basicConfig(
     level=getattr(logging, log_level),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler("backend_debug.log"),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -70,6 +74,52 @@ try:
         conn.commit()
 except Exception:
     pass  # Column already exists
+
+# Migrate: change processes PK to autoincrement integer and make (user_id, id) unique
+try:
+    from sqlalchemy import text as sa_text
+    with engine.connect() as conn:
+        cols = conn.execute(sa_text("PRAGMA table_info(processes)")).fetchall()
+        col_names = [c[1] for c in cols]
+        if cols and "pk" not in col_names:
+            conn.execute(sa_text("ALTER TABLE processes RENAME TO processes_old"))
+            conn.execute(sa_text("""
+                CREATE TABLE processes (
+                    pk INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id VARCHAR,
+                    user_id INTEGER,
+                    contribuinte VARCHAR,
+                    data_abertura VARCHAR,
+                    ano VARCHAR,
+                    status VARCHAR,
+                    setor_atual VARCHAR,
+                    tipo_solicitacao VARCHAR,
+                    dias_atraso_pdf INTEGER,
+                    dias_atraso_calc INTEGER,
+                    is_atrasado BOOLEAN,
+                    created_at DATETIME,
+                    updated_at DATETIME,
+                    FOREIGN KEY(user_id) REFERENCES users(id),
+                    UNIQUE(user_id, id)
+                )
+            """))
+            conn.execute(sa_text("""
+                INSERT INTO processes (
+                    id, user_id, contribuinte, data_abertura, ano, status, setor_atual, tipo_solicitacao,
+                    dias_atraso_pdf, dias_atraso_calc, is_atrasado, created_at, updated_at
+                )
+                SELECT
+                    id, user_id, contribuinte, data_abertura, ano, status, setor_atual, tipo_solicitacao,
+                    dias_atraso_pdf, dias_atraso_calc, is_atrasado, created_at, updated_at
+                FROM processes_old
+            """))
+            conn.execute(sa_text("DROP TABLE processes_old"))
+            conn.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_processes_id ON processes (id)"))
+            conn.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_processes_status ON processes (status)"))
+            conn.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_processes_tipo_solicitacao ON processes (tipo_solicitacao)"))
+            conn.commit()
+except Exception:
+    pass
 
 @app.get("/health")
 def health_check():
@@ -213,20 +263,31 @@ def process_pdf_background(tmp_path: str, user_id: int):
     user_state["error"] = None
     
     try:
-        # This is the CPU bound part
-        data = parse_pdf(tmp_path)
-        
-        # Save to SQL Database
+        def extraction_progress(current, total):
+            # Scale extraction progress from 0% to 20% (leaving 80% for saving)
+            # Frontend uses: 10 + Math.round(pct * 0.85)
+            # If we send (20%), Frontend sees 10 + 17 = 27%
+            pct = int((current / total) * 20)
+            user_state["message"] = f"Extraindo dados... Página {current}/{total} ({pct}%)"
+
+        user_state["message"] = "Extraindo dados do PDF... (0%)"
+        data = parse_pdf(tmp_path, progress_callback=extraction_progress)
+
+        total = len(data)
+        if total == 0:
+            user_state["status"] = "completed"
+            user_state["processed_count"] = 0
+            user_state["message"] = "Nenhum registro encontrado no PDF."
+            return
+
         from models import Process
         from datetime import datetime
 
-        for item in data:
-            # Check if process already exists to avoid duplicates (optional, based on ID)
-            # For now, we will upsert or just insert. ID is primary key.
-            existing = db.query(Process).filter(Process.id == item['id']).first()
-            
+        BATCH_SIZE = 50
+        for i, item in enumerate(data):
+            existing = db.query(Process).filter(Process.user_id == user_id, Process.id == item['id']).first()
+
             if existing:
-                 # Update existing fields
                  existing.contribuinte = item['contribuinte']
                  existing.data_abertura = item['data_abertura']
                  existing.ano = item['ano']
@@ -238,7 +299,6 @@ def process_pdf_background(tmp_path: str, user_id: int):
                  existing.is_atrasado = item['is_atrasado']
                  existing.updated_at = datetime.utcnow()
             else:
-                # Create new
                 new_process = Process(
                     id=item['id'],
                     user_id=user_id,
@@ -253,13 +313,20 @@ def process_pdf_background(tmp_path: str, user_id: int):
                     is_atrasado=item['is_atrasado']
                 )
                 db.add(new_process)
-        
-        db.commit()
-        
+
+            # Commit in batches and update progress
+            if (i + 1) % BATCH_SIZE == 0 or (i + 1) == total:
+                db.commit()
+                db.commit()
+                # Scale saving progress from 20% to 100%
+                pct = int(20 + ((i + 1) / total) * 80)
+                user_state["message"] = f"Salvando registros... {i + 1}/{total} ({pct}%)"
+                user_state["processed_count"] = i + 1
+
         user_state["status"] = "completed"
-        user_state["processed_count"] = len(data)
-        user_state["message"] = f"Sucesso! {len(data)} registros extraídos."
-        logger.info(f"Background processing completed for {user_id}. Extracted {len(data)} records.")
+        user_state["processed_count"] = total
+        user_state["message"] = f"Sucesso! {total} registros extraídos."
+        logger.info(f"Background processing completed for {user_id}. Extracted {total} records.")
         
     except Exception as e:
         logger.error(f"Error in background processing: {e}")
@@ -289,7 +356,9 @@ async def health_check():
 @app.get("/upload/status")
 def get_upload_status(user: User = Depends(get_current_user)):
     """Get the current status of the PDF processing for the authenticated user."""
-    return get_user_upload_state(str(user.id))
+    state = get_user_upload_state(str(user.id))
+    logger.info(f"Checking status for user {user.id}: {state['status']} ({state['processed_count']} processed)")
+    return state
 
 @app.post("/upload")
 async def upload_file(
@@ -297,14 +366,21 @@ async def upload_file(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user)
 ):
+    logger.info(f"Received upload request from user {user.id}. Filename: {file.filename}")
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="File must be a PDF")
     
     user_state = get_user_upload_state(str(user.id))
 
-    # Reset state if not already processing (simple concurrency lock per user)
+    # Block concurrent uploads per user
     if user_state["status"] == "processing":
          raise HTTPException(status_code=409, detail="Já existe um arquivo sendo processado. Aguarde.")
+
+    # Reset state immediately so polling sees "processing" instead of old "completed"
+    user_state["status"] = "processing"
+    user_state["message"] = "Enviando arquivo..."
+    user_state["processed_count"] = 0
+    user_state["error"] = None
 
     # Save to temp file
     try:
@@ -363,6 +439,9 @@ def get_stats(
             return {
                 "total": 0, "encerrados": 0, "andamento": 0, "atrasados": 0,
                 "by_month": [], "by_type": [], 
+                "by_type_delayed": [],
+                "by_type_closed_top": [],
+                "by_type_closed_bottom": [],
                 "all_statuses": [], "all_types": [], "available_months": []
             }
         
@@ -444,6 +523,18 @@ def get_stats(
             by_type.columns = ['type', 'count']
             by_type_data = by_type.to_dict('records')
 
+        # Closed by Type (Top and Bottom)
+        by_type_closed_top = []
+        by_type_closed_bottom = []
+        if not df.empty and 'tipo_solicitacao' in df.columns and 'status' in df.columns:
+            closed_df = df[df['status'].str.contains('ENCERRAMENTO|DEFERIDO|INDEFERIDO', na=False, case=False)]
+            if not closed_df.empty:
+                closed_counts = closed_df.groupby('tipo_solicitacao')['id'].count().reset_index().sort_values('id', ascending=False)
+                top_closed = closed_counts.head(10).rename(columns={'tipo_solicitacao': 'type', 'id': 'count'})
+                bottom_closed = closed_counts.sort_values('id', ascending=True).head(10).rename(columns={'tipo_solicitacao': 'type', 'id': 'count'})
+                by_type_closed_top = top_closed.to_dict('records')
+                by_type_closed_bottom = bottom_closed.to_dict('records')
+
         # Top Delayed Types
         by_type_delayed_data = []
         if not df.empty and 'tipo_solicitacao' in df.columns and 'is_atrasado' in df.columns:
@@ -461,6 +552,8 @@ def get_stats(
             "by_month": evolution_data,
             "by_type": by_type_data,
             "by_type_delayed": by_type_delayed_data,
+            "by_type_closed_top": by_type_closed_top,
+            "by_type_closed_bottom": by_type_closed_bottom,
             "all_statuses": all_statuses,
             "all_types": all_types,
             "available_months": available_months

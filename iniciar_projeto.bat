@@ -5,7 +5,7 @@ echo ==========================================
 
 :: Iniciar Backend em uma nova janela
 echo [1/2] Iniciando Backend (FastAPI)...
-start "Backend - Report Terra" cmd /k "set PYTHONPATH=.&& .venv\Scripts\activate.bat && python -m backend.main"
+start "Backend - Report Terra" cmd /k "cd backend && ..\.venv\Scripts\python.exe -m main"
 
 :: Aguardar um pouco para o backend subir
 timeout /t 3 /nobreak > nul

@@ -40,6 +40,8 @@ export interface KPIStats {
     by_month: { month_year: string; total: number; encerrados: number; andamento: number; atrasados: number }[];
     by_type: { type: string; count: number }[];
     by_type_delayed?: { type: string; count: number }[];
+    by_type_closed_top?: { type: string; count: number }[];
+    by_type_closed_bottom?: { type: string; count: number }[];
     all_statuses?: string[];
     all_types?: string[];
     available_months?: string[];

@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, DateTime, JSON
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, DateTime, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -23,8 +23,13 @@ class User(Base):
 class Process(Base):
     __tablename__ = "processes"
 
-    id = Column(String, primary_key=True, index=True) # "1234 - 2024"
+    pk = Column(Integer, primary_key=True, index=True)
+    id = Column(String, index=True) # "1234 - 2024"
     user_id = Column(Integer, ForeignKey("users.id"))
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "id", name="uix_process_user_id"),
+    )
     
     contribuinte = Column(String)
     data_abertura = Column(String) # Keeping as string to match legacy regex format, or could migrate to Date

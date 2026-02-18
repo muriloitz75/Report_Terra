@@ -25,7 +25,7 @@ try:
 except ValueError:
     DELAY_THRESHOLD_DAYS = 30
 
-def parse_pdf(pdf_path):
+def parse_pdf(pdf_path, progress_callback=None):
     processes = []
     
     # Status keywords to anchor the split
@@ -41,7 +41,14 @@ def parse_pdf(pdf_path):
     start_pattern = re.compile(r"^\s*(\d+ - \d{4})\s+(.+?)(\d{2}/\d{2}/\d{4} \/ \d{2}/\d{2}/\d{4})")
 
     with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages:
+        total_pages = len(pdf.pages)
+        for i, page in enumerate(pdf.pages):
+            if progress_callback:
+                try:
+                    progress_callback(i + 1, total_pages)
+                except Exception:
+                    pass # Ignore callback errors
+
             text = page.extract_text()
             if not text:
                 continue
@@ -164,14 +171,8 @@ def parse_pdf(pdf_path):
                         "is_atrasado": is_delayed
                     })
                 else:
-                    with open("skipped_lines.log", "a", encoding="utf-8") as f:
-                        f.write(f"SKIPPED (No regex match): {line}\n")
-                    
-    
-    # Debug: Print skipped lines to a file
-    # with open("skipped_lines.log", "w", encoding="utf-8") as f:
-    #     pass
-    
+                    logging.debug(f"SKIPPED (No regex match): {line}")
+
     # --- Post-Processing: Deduplicate Request Types ---
     # Heuristic: Map longer types to shorter types if they start with the shorter type.
     # This handles cases where "Column 1" (Type) is merged with "Column 2" (Title/Detail).
