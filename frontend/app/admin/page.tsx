@@ -62,6 +62,19 @@ export default function AdminPage() {
         }
     };
 
+    const handleToggleView = async (user: AdminUser, field: 'can_view_processes' | 'can_view_dashboard' | 'can_view_reports') => {
+        const current = (user as any)[field] !== false;
+        setUpdatingId(user.id);
+        try {
+            await updateAdminUser(user.id, { [field]: !current } as any);
+            setUsers(prev => prev.map(u => u.id === user.id ? { ...(u as any), [field]: !current } : u));
+        } catch {
+            setError('Erro ao atualizar permissão.');
+        } finally {
+            setUpdatingId(null);
+        }
+    };
+
     const handleToggleRole = async (user: AdminUser) => {
         const newRole = user.role === 'admin' ? 'user' : 'admin';
         setUpdatingId(user.id);
@@ -237,7 +250,10 @@ export default function AdminPage() {
                                     <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
                                         <th className="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Usuário</th>
                                         <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Papel</th>
+                                        <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Processos</th>
+                                        <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Dashboard</th>
                                         <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Relatórios IA</th>
+                                        <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Gerar IA</th>
                                         <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Status</th>
                                         <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Ações</th>
                                     </tr>
@@ -266,15 +282,42 @@ export default function AdminPage() {
                                                 </button>
                                             </td>
                                             <td className="px-4 py-3 text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={(user.can_view_processes !== false) || user.role === 'admin'}
+                                                    onChange={() => handleToggleView(user, 'can_view_processes')}
+                                                    disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
+                                                    className="h-4 w-4 accent-blue-600 disabled:opacity-50"
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={(user.can_view_dashboard !== false) || user.role === 'admin'}
+                                                    onChange={() => handleToggleView(user, 'can_view_dashboard')}
+                                                    disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
+                                                    className="h-4 w-4 accent-blue-600 disabled:opacity-50"
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={(user.can_view_reports !== false) || user.role === 'admin'}
+                                                    onChange={() => handleToggleView(user, 'can_view_reports')}
+                                                    disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
+                                                    className="h-4 w-4 accent-blue-600 disabled:opacity-50"
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
                                                 <button
                                                     onClick={() => handleTogglePermission(user)}
-                                                    disabled={updatingId === user.id || user.role === 'admin'}
+                                                    disabled={updatingId === user.id || user.role === 'admin' || user.can_view_reports === false}
                                                     className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                                                         user.can_generate_report || user.role === 'admin'
                                                             ? 'bg-green-500'
                                                             : 'bg-slate-200 dark:bg-slate-700'
                                                     }`}
-                                                    title={user.role === 'admin' ? 'Admins sempre têm acesso' : 'Clique para alternar'}
+                                                    title={user.role === 'admin' ? 'Admins sempre têm acesso' : user.can_view_reports === false ? 'Habilite visualização primeiro' : 'Clique para alternar'}
                                                 >
                                                     <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transform transition-transform ${
                                                         user.can_generate_report || user.role === 'admin' ? 'translate-x-4.5' : 'translate-x-0.5'

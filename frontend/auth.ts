@@ -39,6 +39,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     accessToken,
                     role: payload.role || 'user',
                     canGenerateReport: payload.can_generate_report || false,
+                    canViewProcesses: payload.can_view_processes !== false,
+                    canViewDashboard: payload.can_view_dashboard !== false,
+                    canViewReports: payload.can_view_reports !== false,
                 }
             },
         }),
@@ -50,6 +53,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.role = (user as any).role
                 token.canGenerateReport = (user as any).canGenerateReport
                 token.name = (user as any).name
+                token.canViewProcesses = (user as any).canViewProcesses
+                token.canViewDashboard = (user as any).canViewDashboard
+                token.canViewReports = (user as any).canViewReports
             }
             // Validar se o token do backend ainda é válido
             if (token.accessToken) {
@@ -71,6 +77,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             (session as any).accessToken = token.accessToken
             ;(session as any).role = token.role
             ;(session as any).canGenerateReport = token.canGenerateReport
+            ;(session as any).canViewProcesses = (token as any).canViewProcesses
+            ;(session as any).canViewDashboard = (token as any).canViewDashboard
+            ;(session as any).canViewReports = (token as any).canViewReports
             session.user = session.user || ({} as any)
             session.user.name = (token as any).name || session.user.name || session.user.email
             return session

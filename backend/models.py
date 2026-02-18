@@ -14,6 +14,9 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     role = Column(String, default="user")  # "admin" or "user"
     can_generate_report = Column(Boolean, default=False)
+    can_view_processes = Column(Boolean, default=True)
+    can_view_dashboard = Column(Boolean, default=True)
+    can_view_reports = Column(Boolean, default=True)
     last_login = Column(DateTime, nullable=True)
     approval_status = Column(String, default="approved")
 

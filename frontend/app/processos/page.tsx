@@ -11,8 +11,13 @@ import { DatePickerWithRange } from "@/components/date-range-picker";
 import { ModeToggle as ThemeToggle } from "@/components/mode-toggle";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { usePermissions } from '@/context/PermissionsContext';
 
 export default function ProcessosPage() {
+    const { data: session, status } = useSession();
+    const router = useRouter();
+    const { canViewProcesses, canViewDashboard, canViewReports } = usePermissions();
     const [stats, setStats] = useState<KPIStats | null>(null); // Still needed for filter options
     const [processes, setProcesses] = useState<PaginatedProcesses | null>(null);
     const [loading, setLoading] = useState(false);
@@ -30,6 +35,12 @@ export default function ProcessosPage() {
     const [exporting, setExporting] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    useEffect(() => {
+        if (status === 'loading') return;
+        if (canViewProcesses) return;
+        router.replace(canViewDashboard ? "/dashboard" : canViewReports ? "/relatorios" : "/login");
+    }, [router, status, canViewProcesses, canViewDashboard, canViewReports]);
 
     // Helper to load filter options (stats)
     const loadStats = async () => {
@@ -92,6 +103,7 @@ export default function ProcessosPage() {
             let pollFailCount = 0;
             pollingRef.current = setInterval(async () => {
                 try {
+                    if (typeof document !== "undefined" && document.hidden) return;
                     const status = await getUploadStatus();
                     pollFailCount = 0; // Reset on success
 
@@ -149,7 +161,7 @@ export default function ProcessosPage() {
                         alert("Falha ao verificar status do upload. Recarregue a página.");
                     }
                 }
-            }, 1500);
+            }, 3000);
 
         } catch (error: any) {
             setUploading(false);

@@ -85,6 +85,34 @@ try:
 except Exception:
     pass
 
+# Migrate: add view permissions columns to users if missing
+try:
+    from sqlalchemy import text as sa_text
+    with engine.connect() as conn:
+        conn.execute(sa_text("ALTER TABLE users ADD COLUMN can_view_processes BOOLEAN DEFAULT 1"))
+        conn.execute(sa_text("UPDATE users SET can_view_processes = 1 WHERE can_view_processes IS NULL"))
+        conn.commit()
+except Exception:
+    pass
+
+try:
+    from sqlalchemy import text as sa_text
+    with engine.connect() as conn:
+        conn.execute(sa_text("ALTER TABLE users ADD COLUMN can_view_dashboard BOOLEAN DEFAULT 1"))
+        conn.execute(sa_text("UPDATE users SET can_view_dashboard = 1 WHERE can_view_dashboard IS NULL"))
+        conn.commit()
+except Exception:
+    pass
+
+try:
+    from sqlalchemy import text as sa_text
+    with engine.connect() as conn:
+        conn.execute(sa_text("ALTER TABLE users ADD COLUMN can_view_reports BOOLEAN DEFAULT 1"))
+        conn.execute(sa_text("UPDATE users SET can_view_reports = 1 WHERE can_view_reports IS NULL"))
+        conn.commit()
+except Exception:
+    pass
+
 # Migrate: change processes PK to autoincrement integer and make (user_id, id) unique
 try:
     from sqlalchemy import text as sa_text
@@ -178,6 +206,27 @@ def get_admin_user(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Acesso restrito a administradores")
     return current_user
 
+def require_view_permission(user: User, perm_attr: str, detail: str):
+    if getattr(user, 'role', 'user') == "admin":
+        return
+    if not bool(getattr(user, perm_attr, True)):
+        raise HTTPException(status_code=403, detail=detail)
+
+@app.get("/me")
+def get_me(user: User = Depends(get_current_user)):
+    return {
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "role": getattr(user, "role", "user"),
+        "can_generate_report": bool(getattr(user, "can_generate_report", False)),
+        "can_view_processes": bool(getattr(user, "can_view_processes", True)),
+        "can_view_dashboard": bool(getattr(user, "can_view_dashboard", True)),
+        "can_view_reports": bool(getattr(user, "can_view_reports", True)),
+        "is_active": bool(getattr(user, "is_active", True)),
+        "approval_status": getattr(user, "approval_status", "approved") or "approved",
+    }
+
 # Auth Routes
 @app.post("/token")
 async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
@@ -220,6 +269,9 @@ async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequ
             "full_name": user.full_name,
             "role": getattr(user, 'role', 'user'),
             "can_generate_report": getattr(user, 'can_generate_report', False),
+            "can_view_processes": getattr(user, 'can_view_processes', True),
+            "can_view_dashboard": getattr(user, 'can_view_dashboard', True),
+            "can_view_reports": getattr(user, 'can_view_reports', True),
         },
         expires_delta=access_token_expires
     )
@@ -381,6 +433,7 @@ async def health_check():
 @app.get("/upload/status")
 def get_upload_status(user: User = Depends(get_current_user)):
     """Get the current status of the PDF processing for the authenticated user."""
+    require_view_permission(user, "can_view_processes", "Permissão negada.")
     state = get_user_upload_state(str(user.id))
     logger.info(f"Checking status for user {user.id}: {state['status']} ({state['processed_count']} processed)")
     return state
@@ -392,6 +445,7 @@ async def upload_file(
     user: User = Depends(get_current_user)
 ):
     logger.info(f"Received upload request from user {user.id}. Filename: {file.filename}")
+    require_view_permission(user, "can_view_processes", "Permissão negada.")
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="File must be a PDF")
     
@@ -424,6 +478,7 @@ async def upload_file(
 def clear_records(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Clear all process records for the authenticated user."""
     from models import Process
+    require_view_permission(user, "can_view_processes", "Permissão negada.")
     
     try:
         deleted_count = db.query(Process).filter(Process.user_id == user.id).delete()
@@ -449,6 +504,7 @@ def get_stats(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    require_view_permission(user, "can_view_dashboard", "Permissão negada.")
     try:
         from models import Process
         # Optimized: Fetch directly from DB instead of loading all valid users
@@ -604,6 +660,7 @@ def get_processes(
     db: Session = Depends(get_db)
 ):
     from models import Process
+    require_view_permission(user, "can_view_processes", "Permissão negada.")
     
     # Query Database
     query = db.query(Process).filter(Process.user_id == user.id)
@@ -695,6 +752,7 @@ def export_excel(
     import xlsxwriter
     from datetime import datetime
     from models import Process
+    require_view_permission(user, "can_view_processes", "Permissão negada.")
 
     # Query Database
     query = db.query(Process).filter(Process.user_id == user.id)
@@ -895,6 +953,9 @@ def export_excel(
 class UserUpdate(BaseModel):
     role: Optional[str] = None
     can_generate_report: Optional[bool] = None
+    can_view_processes: Optional[bool] = None
+    can_view_dashboard: Optional[bool] = None
+    can_view_reports: Optional[bool] = None
     is_active: Optional[bool] = None
     approval_status: Optional[str] = None
 
@@ -908,6 +969,9 @@ def admin_list_users(admin: User = Depends(get_admin_user), db: Session = Depend
             "full_name": u.full_name,
             "role": getattr(u, 'role', 'user'),
             "can_generate_report": bool(getattr(u, 'can_generate_report', False)),
+            "can_view_processes": bool(getattr(u, 'can_view_processes', True)),
+            "can_view_dashboard": bool(getattr(u, 'can_view_dashboard', True)),
+            "can_view_reports": bool(getattr(u, 'can_view_reports', True)),
             "is_active": u.is_active,
             "approval_status": getattr(u, "approval_status", "approved") or "approved",
             "created_at": u.created_at.isoformat() if u.created_at else None,
@@ -924,6 +988,12 @@ def admin_update_user(user_id: int, update: UserUpdate, admin: User = Depends(ge
         user.role = update.role
     if update.can_generate_report is not None:
         user.can_generate_report = update.can_generate_report
+    if update.can_view_processes is not None:
+        user.can_view_processes = update.can_view_processes
+    if update.can_view_dashboard is not None:
+        user.can_view_dashboard = update.can_view_dashboard
+    if update.can_view_reports is not None:
+        user.can_view_reports = update.can_view_reports
     if update.is_active is not None:
         user.is_active = update.is_active
     if update.approval_status is not None:
@@ -938,6 +1008,9 @@ def admin_update_user(user_id: int, update: UserUpdate, admin: User = Depends(ge
         "full_name": user.full_name,
         "role": getattr(user, 'role', 'user'),
         "can_generate_report": bool(getattr(user, 'can_generate_report', False)),
+        "can_view_processes": bool(getattr(user, 'can_view_processes', True)),
+        "can_view_dashboard": bool(getattr(user, 'can_view_dashboard', True)),
+        "can_view_reports": bool(getattr(user, 'can_view_reports', True)),
         "is_active": user.is_active,
         "approval_status": getattr(user, "approval_status", "approved") or "approved",
         "created_at": user.created_at.isoformat() if user.created_at else None,
@@ -1164,7 +1237,7 @@ async def generate_report(
     Generates an AI report based on the filtered data.
     Streams the response in Markdown format.
     """
-    # Check permission: admin always can; others need can_generate_report=True
+    require_view_permission(user, "can_view_reports", "Permissão negada.")
     user_role = getattr(user, 'role', 'user')
     user_can = getattr(user, 'can_generate_report', False)
     if user_role != "admin" and not user_can:

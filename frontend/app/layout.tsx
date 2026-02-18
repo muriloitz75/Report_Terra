@@ -13,6 +13,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 
 import { ReportProvider } from "@/context/ReportContext";
 import { SessionProvider } from "./SessionProvider";
+import { PermissionsProvider } from "@/context/PermissionsContext";
 
 export const metadata: Metadata = {
   title: "Report Terra",
@@ -35,12 +36,14 @@ export default function RootLayout({
         >
           <ReportProvider>
             <SessionProvider>
-              <div className="flex h-screen overflow-hidden">
-                <ConditionalSidebar />
-                <main className="flex-1 overflow-y-auto">
-                  {children}
-                </main>
-              </div>
+              <PermissionsProvider>
+                <div className="flex h-screen overflow-hidden">
+                  <ConditionalSidebar />
+                  <main className="flex-1 overflow-y-auto">
+                    {children}
+                  </main>
+                </div>
+              </PermissionsProvider>
             </SessionProvider>
           </ReportProvider>
         </ThemeProvider>

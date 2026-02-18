@@ -11,15 +11,26 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { FileText, Bot, Loader2, Sparkles, Trash2, Wand2, Download, ThumbsUp, ThumbsDown, Lock } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { usePermissions } from '@/context/PermissionsContext';
 
 
 
 function RelatoriosContent() {
     const { report, loading, generate, clearReport: contextClearReport } = useReport();
-    const { data: session } = useSession();
-    const canGenerate = (session as any)?.role === 'admin' || (session as any)?.canGenerateReport === true;
+    const { data: session, status } = useSession();
+    const router = useRouter();
+    const { canViewProcesses, canViewDashboard, canViewReports, canGenerateReport } = usePermissions();
+    const canView = canViewReports;
+    const canGenerate = canGenerateReport;
     const [prompt, setPrompt] = useState("");
     const [feedbackGiven, setFeedbackGiven] = useState<"positive" | "negative" | null>(null);
+
+    useEffect(() => {
+        if (status === "loading") return;
+        if (canView) return;
+        router.replace(canViewDashboard ? "/dashboard" : canViewProcesses ? "/processos" : "/login");
+    }, [router, status, canView, canViewDashboard, canViewProcesses]);
 
     // Filter state
     const [filters, setFilters] = useState({

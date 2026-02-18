@@ -6,6 +6,7 @@ import { LayoutDashboard, TableProperties, FileText, Menu, X, LogOut, Shield, Po
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/context/PermissionsContext";
 
 export function AppSidebar() {
     const pathname = usePathname();
@@ -13,8 +14,8 @@ export function AppSidebar() {
     const [isHovered, setIsHovered] = useState(false);
     const [isShutdown, setIsShutdown] = useState(false);
     const { data: session } = useSession();
+    const { isAdmin, canViewProcesses, canViewDashboard, canViewReports } = usePermissions();
 
-    const isAdmin = (session as any)?.role === "admin";
     const userName = session?.user?.name || session?.user?.email || "Usuário";
     const userInitial = userName.charAt(0).toUpperCase();
 
@@ -25,10 +26,10 @@ export function AppSidebar() {
     };
 
     const links = [
-        { name: "Processos", href: "/processos", icon: TableProperties },
-        { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-        { name: "Relatórios IA", href: "/relatorios", icon: FileText },
-    ];
+        canViewProcesses ? { name: "Processos", href: "/processos", icon: TableProperties } : null,
+        canViewDashboard ? { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard } : null,
+        canViewReports ? { name: "Relatórios IA", href: "/relatorios", icon: FileText } : null,
+    ].filter(Boolean) as Array<{ name: string; href: string; icon: any }>;
 
     return (
         <>

@@ -10,6 +10,8 @@ import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { DatePickerWithRange } from "@/components/date-range-picker";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { usePermissions } from '@/context/PermissionsContext';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#8dd1e1', '#a4de6c', '#d0ed57'];
 
@@ -20,6 +22,15 @@ function DashboardContent() {
     const [loading, setLoading] = useState(false);
     const [dbLoaded, setDbLoaded] = useState(false);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+    const { data: session, status } = useSession();
+    const router = useRouter();
+    const { canViewProcesses, canViewDashboard, canViewReports } = usePermissions();
+
+    useEffect(() => {
+        if (status === 'loading') return;
+        if (canViewDashboard) return;
+        router.replace(canViewProcesses ? "/processos" : canViewReports ? "/relatorios" : "/login");
+    }, [router, status, canViewProcesses, canViewDashboard, canViewReports]);
 
     const loadData = async () => {
         setLoading(true);

@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 
 export default auth((req: any) => {
-    const publicPaths = ["/login", "/cadastro", "/api/auth", "/token", "/health", "/auth"];
+    const publicPaths = ["/login", "/cadastro", "/api/auth", "/token", "/health", "/auth", "/me"];
     const isPublicPath = publicPaths.some(path => req.nextUrl.pathname.startsWith(path));
 
     // Redirecionar para login se: sem sessão, ou sessão expirada (sem accessToken)
