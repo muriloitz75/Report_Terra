@@ -21,7 +21,11 @@ export function AppSidebar() {
 
     const handleShutdown = async () => {
         if (confirm("Deseja realmente sair da aplicação?")) {
-            await signOut({ redirect: true, callbackUrl: "/login" });
+            try {
+                await signOut({ redirect: false });
+            } finally {
+                window.location.assign("/login");
+            }
         }
     };
 
