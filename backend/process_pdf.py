@@ -4,6 +4,7 @@ import os
 from datetime import datetime, timedelta
 import logging
 import unicodedata
+from tipo_resolver import resolve_tipo
 
 # Disable verbose pdfminer logs
 logging.getLogger('pdfminer').setLevel(logging.WARNING)
@@ -11,12 +12,9 @@ logging.getLogger('pdfminer').setLevel(logging.WARNING)
 def normalize_text(text):
     """Normalize text: remove accents, standardize dashes, uppercase."""
     if not text: return ""
-    # Normalize unicode characters (e.g. decompose accents)
     nfkd_form = unicodedata.normalize('NFKD', text)
-    # Filter out non-spacing mark characters (accents)
     text_no_accents = "".join([c for c in nfkd_form if not unicodedata.combining(c)])
-    # Replace various dashes with standard hyphen
-    text_normalized = text_no_accents.replace('–', '-').replace('—', '-').upper()
+    text_normalized = text_no_accents.replace('\u2013', '-').replace('\u2014', '-').upper()
     return text_normalized.strip()
 
 # Business Rules Configuration
@@ -26,209 +24,175 @@ except ValueError:
     DELAY_THRESHOLD_DAYS = 30
 
 def parse_pdf(pdf_path, progress_callback=None):
+    """
+    Parse a Sistema Terra PDF report using bounding-box column detection.
+
+    PDF Column X boundaries (confirmed from header row via extract_words):
+      ID         : x < 85
+      Contribuinte: 85 <= x < 213
+      Datas      : 213 <= x < 390
+      Status     : 390 <= x < 487   (Situação column - "Setor de Cadastro" overlaps but Status is at ~389)
+      Setor Atual: 487 <= x < 581
+      Tipo       : 581 <= x < 676
+      Titulo     : 676 <= x < 772
+      Dias       : x >= 772
+    """
     processes = []
-    
-    # Status keywords to anchor the split
+
     STATUS_KEYWORDS = [
-        "ANDAMENTO", "ENCERRAMENTO", "DEFERIDO", "INDEFERIDO", 
+        "ANDAMENTO", "ENCERRAMENTO", "DEFERIDO", "INDEFERIDO",
         "SUSPENSO", "CANCELADO", "RETORNO", "EM DILIGENCIA", "PENDENCIA"
     ]
-    status_pattern = r"\s+(" + "|".join(STATUS_KEYWORDS) + r")\s+"
-    
-    # Regex to capture the start of the line: ID + Contribuinte + Dates
-    # Handling potential missing space before dates: (.+?)(\d{2}...)
-    # Updated to allow variable length IDs and optional leading whitespace
-    start_pattern = re.compile(r"^\s*(\d+ - \d{4})\s+(.+?)(\d{2}/\d{2}/\d{4} \/ \d{2}/\d{2}/\d{4})")
+
+    # Column X boundaries derived from PDF header row bounding-box analysis
+    # Actual word positions observed:
+    #   Status words (ANDAMENTO etc): x ~ 389.0
+    #   NUCLEO (start of Setor Atual): x ~ 485.4
+    #   First word of Tipo:            x ~ 581.7 (varies by content)
+    COL_ID_END      = 85
+    COL_CONTRIB_END = 213
+    COL_DATAS_END   = 388   # Status starts at x=389, so cut before it
+    COL_STATUS_END  = 484   # NUCLEO starts at x=485.4, cut before it
+    COL_SETOR_END   = 580   # Tipo starts at x=581.7 or higher
+    COL_TIPO_END    = 676
+    COL_TITULO_END  = 772
+
 
     with pdfplumber.open(pdf_path) as pdf:
         total_pages = len(pdf.pages)
-        for i, page in enumerate(pdf.pages):
+        for page_idx, page in enumerate(pdf.pages):
             if progress_callback:
                 try:
-                    progress_callback(i + 1, total_pages)
+                    progress_callback(page_idx + 1, total_pages)
                 except Exception:
-                    pass # Ignore callback errors
+                    pass
 
-            text = page.extract_text()
-            if not text:
+            words = page.extract_words(x_tolerance=3, y_tolerance=3)
+            if not words:
                 continue
-                
-            lines = text.split('\n')
-            for line in lines:
-                # Skip headers (heuristic: starts with "Nº Proc")
-                if "Nº Proc. / Ano" in line or "PREFEITURA DE IMPERATRIZ" in line or not line.strip():
-                    continue
-                
-                match = start_pattern.search(line)
-                if match:
-                    proc_id = match.group(1)
-                    contribuinte = match.group(2).strip()
-                    dates_str = match.group(3)
-                    
-                    # Parse dates
-                    try:
-                        entry_date_str = dates_str.split(' / ')[0]
-                        entry_date = datetime.strptime(entry_date_str, "%d/%m/%Y")
-                    except:
-                        entry_date = None
-                    
-                    # Remainder of the line after the dates
-                    remainder = line[match.end():].strip()
-                    
-                    # Split by Status
-                    status_match = re.search(status_pattern, remainder)
-                    status = "DESCONHECIDO"
-                    sector_cad = ""
-                    rest_after_status = remainder
-                    
-                    if status_match:
-                        status = status_match.group(1)
-                        sector_cad = remainder[:status_match.start()].strip()
-                        rest_after_status = remainder[status_match.end():].strip()
-                    
-                    # Split Setor Atual (Assuming "DIRETORIA DE ARRECADAÇ" or finding the next block)
-                    # Heuristic: Setor Atual is usually the first block after Status.
-                    # We will try to find "DIRETORIA DE ARRECADAÇ" explicitly or take the first few words?
-                    # Let's look for known sectors or just take everything before the Request Type.
-                    # Given the difficulty, let's look for "DIRETORIA DE ARRECADAÇ" as a delimiter
-                    
-                    sector_current = "N/A"
-                    request_type_full = rest_after_status
-                    
-                    # Regex flexível para capturar setores conhecidos
-                    # Procura pelo setor em qualquer lugar da string após o status
-                    # Grupos: 1=Lixo/Prefixo, 2=Setor, 3=Tipo de Solicitação
-                    sector_pattern = re.compile(r"(.*?)(DIRETORIA DE ARRECADA.*?|PROTOCOLO E ATENDIMEN.*?|GABINETE.*?)\s+(.*)")
-                    
-                    sector_match = sector_pattern.search(rest_after_status)
-                    
-                    if sector_match:
-                        # group(1) é o que vem antes (ex: "PARCIAL "), ignoramos ou juntamos ao setor se fizer sentido.
-                        # Por enquanto, vamos ignorar o prefixo sujo e pegar o setor limpo.
-                        sector_current = sector_match.group(2).strip()
-                        request_type_full = sector_match.group(3).strip()
+
+            # Group words into rows by rounded top position
+            rows = {}
+            for w in words:
+                row_key = round(w["top"])
+                rows.setdefault(row_key, []).append(w)
+
+            for row_key in sorted(rows.keys()):
+                row_words = sorted(rows[row_key], key=lambda w: w["x0"])
+
+                # Assign each word to its column based on x0 position
+                col_id       = []
+                col_contrib  = []
+                col_datas    = []
+                col_status   = []
+                col_setor_at = []
+                col_tipo     = []
+                col_titulo   = []
+                col_dias     = []
+
+                for w in row_words:
+                    x = w["x0"]
+                    t = w["text"]
+                    if x < COL_ID_END:
+                        col_id.append(t)
+                    elif x < COL_CONTRIB_END:
+                        col_contrib.append(t)
+                    elif x < COL_DATAS_END:
+                        col_datas.append(t)
+                    elif x < COL_STATUS_END:
+                        col_status.append(t)
+                    elif x < COL_SETOR_END:
+                        col_setor_at.append(t)
+                    elif x < COL_TIPO_END:
+                        col_tipo.append(t)
+                    elif x < COL_TITULO_END:
+                        col_titulo.append(t)
                     else:
-                        # Fallback: Tenta separar por "DIRETORIA" genérico se não casou com o acima
-                        if "DIRETORIA" in rest_after_status:
-                             parts = rest_after_status.split("DIRETORIA", 1) # Split apenas na primeira ocorrência
-                             if len(parts) > 1:
-                                 # Tenta inferir se é um setor válido
-                                 # Assume que DIRETORIA é o início do setor
-                                 # Mas o split removeu o termo.
-                                 # Vamos tentar pegar tudo a partir de DIRETORIA
-                                 idx = rest_after_status.find("DIRETORIA")
-                                 sector_current = rest_after_status[idx:] # Pega tudo... arriscado se o tipo estiver depois
-                                 # Melhor abordagem: Se tiver DIRETORIA, assume que o setor vai até o fim SE não tiver mais espaços grandes?
-                                 # Ou tenta quebrar no próximo espaço duplo?
-                                 # Por enquanto, se falhar no regex principal, vamos assumir N/A para evitar sujar o tipo.
-                                 pass
-                    
-                    # Clean up Request Type (remove trailing days digits if separate)
-                    # Example: "BAIXA DE DÉBITOS SIMPLE 8" -> "BAIXA DE DÉBITOS SIMPLE", "8"
-                    days_delay_pdf = 0
-                    days_match = re.search(r"\s+(\d+)$", request_type_full)
-                    if days_match:
-                        try:
-                            days_delay_pdf = int(days_match.group(1))
-                            request_type_full = request_type_full[:days_match.start()].strip()
-                        except:
-                            pass
-                    
-                    # Normalize Request Type (remove extra spaces and inconsistent whitespace)
-                    if request_type_full:
-                        request_type_full = " ".join(request_type_full.split())
-                            
-                    # Calculate 'is_delayed' based on USER RULE: 30 days after entry
-                    is_delayed = False
-                    days_since_entry = 0
-                    current_date = datetime.now()
-                    
-                    if entry_date:
-                        delta = current_date - entry_date
-                        days_since_entry = delta.days
-                        # Rule: Atrasado if > 30 days AND Status != ENCERRAMENTO (and maybe DEFERIDO/INDEFERIDO?)
-                        # Assuming 'Em Andamento' are the ones that can be delayed.
-                        # User said: "Atrasados são considerados com este estatus 30 dias após o cadastro de abertura"
-                        # And: "Atrasados (Este último em relação aos em andamento)"
-                        # So implies only 'ANDAMENTO' counts? Or any open process?
-                        # I'll check if status is NOT final (Final = ENCERRAMENTO, DEFERIDO, INDEFERIDO, CANCELADO)
-                        # Actually user said "Atrasados (Este último em relação aos em andamento)".
-                        # This implies we check delay ONLY for "ANDAMENTO".
-                        
-                        if status == "ANDAMENTO" and days_since_entry > DELAY_THRESHOLD_DAYS:
-                            is_delayed = True
-                            
-                    processes.append({
-                        "id": proc_id,
-                        "contribuinte": contribuinte,
-                        "data_abertura": entry_date_str if entry_date else "",
-                        "ano": proc_id.split(' - ')[1] if ' - ' in proc_id else "",
-                        "status": status,
-                        "setor_atual": sector_current,
-                        "tipo_solicitacao": request_type_full,
-                        "dias_atraso_pdf": days_delay_pdf,
-                        "dias_atraso_calc": days_since_entry - DELAY_THRESHOLD_DAYS if is_delayed else 0, # Positive delay
-                        "is_atrasado": is_delayed
-                    })
-                else:
-                    logging.debug(f"SKIPPED (No regex match): {line}")
+                        col_dias.append(t)
 
-    # --- Post-Processing: Deduplicate Request Types ---
-    # Heuristic: Map longer types to shorter types if they start with the shorter type.
-    # This handles cases where "Column 1" (Type) is merged with "Column 2" (Title/Detail).
-    # Example: "CANCELAMENTO DE NOTAS" vs "CANCELAMENTO DE NOTAS CANCELAMENTO DE NOTA F"
-    
-    # 1. Collect all unique types
-    # First, normalize all types in the processes list itself
-    for p in processes:
-        p['tipo_solicitacao'] = normalize_text(p['tipo_solicitacao'])
+                id_text = " ".join(col_id).strip()
 
-    unique_types = sorted(list(set(p['tipo_solicitacao'] for p in processes)), key=len)
-    
-    # 2. Build mapping (Long -> Shortest Valid Prefix)
-    # Actually we want the Longest Valid Prefix to be safe? 
-    # e.g. "Type A Subtype B" -> "Type A" (if "Type A" exists)
-    type_mapping = {}
-    
-    for t_long in unique_types:
-        best_base = t_long
-        for t_short in unique_types:
-            # Must be strictly shorter
-            if len(t_short) < len(t_long):
-                # Must be a prefix
-                if t_long.startswith(t_short):
-                    # Must respect word boundary (next char is space)
-                    # t_long is longer, so t_long[len(t_short)] exists.
-                    char_after = t_long[len(t_short)]
-                    if char_after == ' ':
-                        # Found a valid prefix.
-                        # We want the Longest such prefix (most specific).
-                        # Since unique_types is sorted by length, we are iterating from short to long.
-                        # So this t_short is longer than previous ones? No, outer loop is t_long.
-                        # Inner loop: sorted by length. So we will see shorter ones first.
-                        # We want to keep updating best_base if we find a longer match.
-                        best_base = t_short
-        
-        type_mapping[t_long] = best_base
+                # Only process rows that are data rows (ID starts with digit)
+                if not id_text or not id_text[0].isdigit():
+                    continue
 
-    # 3. Apply mapping
-    for p in processes:
-        p['tipo_solicitacao'] = type_mapping.get(p['tipo_solicitacao'], p['tipo_solicitacao'])
-        
-        # Hardcoded corrections for cut-off types (based on user feedback)
-        t = p['tipo_solicitacao']
-        if t in ['CREDITO TRIBUTARIO - RES', 'CREDITO TRIBUTARIO - RE']:
-            p['tipo_solicitacao'] = 'CREDITO TRIBUTARIO - RESTITUICAO'
-        elif t in ['IMUNIDADE TRIBUTARIA - R', 'IMUNIDADE TRIBUTARIA - RE']:
-             p['tipo_solicitacao'] = 'IMUNIDADE TRIBUTARIA - RECONHECIMENTO' # Assumption based on pattern, can be adjusted
-        elif t == 'CANCELAMENTO DE NOTA F':
-             p['tipo_solicitacao'] = 'CANCELAMENTO DE NOTAS'
+                # Reconstruct fields
+                contribuinte = " ".join(col_contrib).strip()
+                datas_text   = " ".join(col_datas).strip()
+                status_raw   = " ".join(col_status).strip()
+                setor_atual  = " ".join(col_setor_at).strip()
+                tipo_raw     = " ".join(col_tipo).strip()
+                dias_text    = " ".join(col_dias).strip()
+
+                # Normalize status keyword
+                status = "DESCONHECIDO"
+                for kw in STATUS_KEYWORDS:
+                    if kw in status_raw.upper():
+                        status = kw
+                        break
+
+                # Parse opening date (first date in the dates column)
+                entry_date_str = ""
+                entry_date = None
+                date_match = re.search(r"(\d{2}/\d{2}/\d{4})", datas_text)
+                if date_match:
+                    entry_date_str = date_match.group(1)
+                    try:
+                        entry_date = datetime.strptime(entry_date_str, "%d/%m/%Y")
+                    except Exception:
+                        pass
+
+                # Parse year from ID (e.g. "001157 - 2026")
+                ano = ""
+                proc_id = id_text
+                id_match = re.match(r"(\d+)\s*-\s*(\d{4})", proc_id)
+                if id_match:
+                    ano = id_match.group(2)
+                    proc_id = f"{id_match.group(1)} - {id_match.group(2)}"
+
+                # Parse days delay from dias column
+                days_delay_pdf = 0
+                if dias_text:
+                    try:
+                        days_delay_pdf = int(dias_text.strip())
+                    except Exception:
+                        pass
+
+                # Resolve tipo_solicitacao against canonical reference list
+                tipo_solicitacao = resolve_tipo(tipo_raw.strip()) if tipo_raw else ""
+
+                # Calculate delay
+                is_delayed = False
+                days_since_entry = 0
+                if entry_date:
+                    delta = datetime.now() - entry_date
+                    days_since_entry = delta.days
+                    if status == "ANDAMENTO" and days_since_entry > DELAY_THRESHOLD_DAYS:
+                        is_delayed = True
+
+                processes.append({
+                    "id": proc_id,
+                    "contribuinte": contribuinte,
+                    "data_abertura": entry_date_str,
+                    "ano": ano,
+                    "status": status,
+                    "setor_atual": setor_atual,
+                    "tipo_solicitacao": tipo_solicitacao,
+                    "dias_atraso_pdf": days_delay_pdf,
+                    "dias_atraso_calc": days_since_entry - DELAY_THRESHOLD_DAYS if is_delayed else 0,
+                    "is_atrasado": is_delayed
+                })
+
+    # tipo_solicitacao is already resolved and preserved in canonical form by resolve_tipo
 
     return processes
 
+
 if __name__ == "__main__":
     import json
-    data = parse_pdf("pdf model/21.pdf")
+    folder = "pdf model"
+    files = [f for f in os.listdir(folder) if f.endswith(".pdf")]
+    data = parse_pdf(os.path.join(folder, files[0]))
     with open("extracted_data.json", "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     print(f"Total extracted: {len(data)}")
