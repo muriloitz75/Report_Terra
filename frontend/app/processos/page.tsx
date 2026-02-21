@@ -156,6 +156,12 @@ export default function ProcessosPage() {
                 if (res.status === 'processing') {
                     setUploading(true);
                     setUploadMessage(res.message || "Processando em segundo plano...");
+
+                    // Optimistic UI Update na navegação: 
+                    // Se o usuário entrou na página e já está fazendo upload, apaga a tela "fantasma" que o loadData() trouxe.
+                    setProcesses(null);
+                    setStats(null);
+
                     startPolling();
                 }
             } catch (e) {
