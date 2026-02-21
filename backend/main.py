@@ -414,6 +414,15 @@ def process_pdf_background(tmp_path: str, user_id: int):
         db.commit()
         
         for i, item in enumerate(data):
+            if user_state.get("should_cancel"):
+                logger.info(f"Upload cancelled by user {user_id}. Rolling back DB.")
+                db.query(Process).filter(Process.user_id == user_id).delete()
+                db.commit()
+                user_state["status"] = "error"
+                user_state["message"] = "Upload cancelado pelo usuário."
+                user_state["error"] = "Cancelado"
+                return
+
             new_process = Process(
                 id=item['id'],
                 user_id=user_id,
@@ -475,6 +484,16 @@ def get_upload_status(user: User = Depends(get_current_user)):
     logger.info(f"Checking status for user {user.id}: {state['status']} ({state['processed_count']} processed)")
     return state
 
+@app.post("/upload/cancel")
+def cancel_upload(user: User = Depends(get_current_user)):
+    """Set the should_cancel flag for the background process."""
+    require_view_permission(user, "can_view_processes", "Permissão negada.")
+    state = get_user_upload_state(str(user.id))
+    if state["status"] == "processing":
+        state["should_cancel"] = True
+        return {"message": "Cancelamento solicitado."}
+    return {"message": "Nenhum upload em andamento."}
+
 @app.post("/upload")
 async def upload_file(
     background_tasks: BackgroundTasks, 
@@ -497,6 +516,7 @@ async def upload_file(
     user_state["message"] = "Enviando arquivo..."
     user_state["processed_count"] = 0
     user_state["error"] = None
+    user_state["should_cancel"] = False
 
     # Save to temp file
     try:

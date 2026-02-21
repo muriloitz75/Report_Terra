@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { uploadPDF, getStats, getProcesses, exportExcel, clearRecords, PaginatedProcesses, getUploadStatus, KPIStats } from '@/lib/api';
+import { uploadPDF, getStats, getProcesses, exportExcel, clearRecords, PaginatedProcesses, getUploadStatus, KPIStats, cancelUpload } from '@/lib/api';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Upload, RefreshCw, AlertCircle, Check, ListFilter, Loader2, Search, Download, FilterX, TableProperties, Trash2, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Upload, RefreshCw, AlertCircle, Check, ListFilter, Loader2, Search, Download, FilterX, TableProperties, Trash2, ChevronsLeft, ChevronsRight, X } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { DatePickerWithRange } from "@/components/date-range-picker";
@@ -209,6 +209,17 @@ export default function ProcessosPage() {
         }
     };
 
+    const handleCancelUpload = async () => {
+        try {
+            await cancelUpload();
+            setUploadMessage("Cancelando...");
+            // Polling will catch the 'error' or 'cancelled' status and reset the UI
+        } catch (error) {
+            console.error("Falha ao cancelar upload", error);
+            alert("Erro ao tentar cancelar o upload. Ele pode já ter terminado.");
+        }
+    };
+
     const statusOptions = stats?.all_statuses || ["ENCERRAMENTO", "ANDAMENTO", "INDEFERIDO", "DEFERIDO"];
 
 
@@ -237,9 +248,9 @@ export default function ProcessosPage() {
                             onChange={handleFileUpload}
                             disabled={uploading}
                         />
-                        <label htmlFor="pdf-upload">
-                            {uploading ? (
-                                <div className="flex flex-col gap-1.5 min-w-[200px] cursor-default">
+                        {uploading ? (
+                            <div className="flex items-center gap-2">
+                                <div className="flex flex-col gap-1.5 min-w-[200px] cursor-default bg-slate-50 dark:bg-slate-900 border px-3 py-1.5 rounded-md">
                                     <div className="flex items-center justify-between text-xs">
                                         <span className="text-slate-600 dark:text-slate-400 truncate max-w-[160px]">
                                             {uploadProgress >= 100 ? "Concluído!" : uploadMessage || "Processando..."}
@@ -255,15 +266,26 @@ export default function ProcessosPage() {
                                         />
                                     </div>
                                 </div>
-                            ) : (
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-10 w-10 text-red-500 border-red-200 hover:bg-red-50 hover:border-red-300 dark:border-red-900 dark:hover:bg-red-900/50"
+                                    onClick={handleCancelUpload}
+                                    title="Cancelar Envio"
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ) : (
+                            <label htmlFor="pdf-upload">
                                 <Button variant="default" className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white" asChild>
                                     <span>
                                         <Upload className="w-4 h-4 mr-2" />
                                         Importar PDF
                                     </span>
                                 </Button>
-                            )}
-                        </label>
+                            </label>
+                        )}
                     </div>
 
                     <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
@@ -311,6 +333,17 @@ export default function ProcessosPage() {
                             ? "O PDF está sendo processado a toda velocidade nos bastidores da aplicação..."
                             : "Estamos conferindo se há alguma atividade nos bastidores, só um instante..."}
                     </p>
+
+                    {uploading && (
+                        <Button
+                            variant="outline"
+                            className="mt-6 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/50 dark:hover:bg-red-900/30"
+                            onClick={handleCancelUpload}
+                        >
+                            <X className="w-4 h-4 mr-2" />
+                            Cancelar Processamento
+                        </Button>
+                    )}
                 </div>
             )}
 
