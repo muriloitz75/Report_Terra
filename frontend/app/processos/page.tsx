@@ -83,6 +83,88 @@ export default function ProcessosPage() {
         };
     }, []);
 
+    const startPolling = () => {
+        if (pollingRef.current) return;
+        let pollFailCount = 0;
+        pollingRef.current = setInterval(async () => {
+            try {
+                if (typeof document !== "undefined" && document.hidden) return;
+                const status = await getUploadStatus();
+                pollFailCount = 0; // Reset on success
+
+                if (status.status === 'processing') {
+                    setUploadMessage(status.message || "Processando...");
+                    const pctMatch = status.message?.match(/\((\d+)%\)/);
+                    if (pctMatch) {
+                        setUploadProgress(10 + Math.round(parseInt(pctMatch[1]) * 0.85));
+                    } else if (status.message?.includes("Extraindo")) {
+                        setUploadProgress(15);
+                    }
+                } else if (status.status === 'completed') {
+                    if (pollingRef.current) {
+                        clearInterval(pollingRef.current);
+                        pollingRef.current = null;
+                    }
+                    setUploadMessage(`Concluído! ${status.processed_count} registros.`);
+                    setUploadProgress(100);
+
+                    // Refresh data - reset filters and force reload
+                    setDateRange(undefined);
+                    setStats(null);
+                    setPage(1);
+                    setRefreshKey(k => k + 1);
+
+                    // Reset UI after short delay
+                    setTimeout(() => {
+                        setUploading(false);
+                        setUploadMessage("");
+                        setUploadProgress(0);
+                    }, 1500);
+                } else if (status.status === 'error') {
+                    if (pollingRef.current) {
+                        clearInterval(pollingRef.current);
+                        pollingRef.current = null;
+                    }
+                    setUploading(false);
+                    setUploadMessage("");
+                    setUploadProgress(0);
+                    alert(`Erro no processamento: ${status.error}`);
+                }
+            } catch (err) {
+                console.error("Polling error", err);
+                pollFailCount++;
+                if (pollFailCount >= 5) {
+                    if (pollingRef.current) {
+                        clearInterval(pollingRef.current);
+                        pollingRef.current = null;
+                    }
+                    setUploading(false);
+                    setUploadMessage("");
+                    setUploadProgress(0);
+                    alert("Falha ao verificar status do upload. Recarregue a página.");
+                }
+            }
+        }, 3000);
+    };
+
+    // Check for ongoing background upload on mount
+    useEffect(() => {
+        if (status === 'loading' || !canViewProcesses) return;
+        const checkUpload = async () => {
+            try {
+                const res = await getUploadStatus();
+                if (res.status === 'processing') {
+                    setUploading(true);
+                    setUploadMessage(res.message || "Processando em segundo plano...");
+                    startPolling();
+                }
+            } catch (e) {
+                console.error("Não foi possível verificar status de upload", e);
+            }
+        };
+        checkUpload();
+    }, [status, canViewProcesses]);
+
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files?.[0]) return;
         const file = e.target.files[0];
@@ -99,69 +181,7 @@ export default function ProcessosPage() {
             // 2. Start Polling
             setUploadMessage("Processando PDF...");
             setUploadProgress(10);
-
-            let pollFailCount = 0;
-            pollingRef.current = setInterval(async () => {
-                try {
-                    if (typeof document !== "undefined" && document.hidden) return;
-                    const status = await getUploadStatus();
-                    pollFailCount = 0; // Reset on success
-
-                    if (status.status === 'processing') {
-                        setUploadMessage(status.message || "Processando...");
-                        // Extract percentage from backend message like "Salvando registros... 50/173 (28%)"
-                        const pctMatch = status.message?.match(/\((\d+)%\)/);
-                        if (pctMatch) {
-                            // Map backend 0-100% to display 10-95% (10% reserved for upload, 5% for finalization)
-                            setUploadProgress(10 + Math.round(parseInt(pctMatch[1]) * 0.85));
-                        } else if (status.message?.includes("Extraindo")) {
-                            setUploadProgress(15);
-                        }
-                    } else if (status.status === 'completed') {
-                        if (pollingRef.current) {
-                            clearInterval(pollingRef.current);
-                            pollingRef.current = null;
-                        }
-                        setUploadMessage(`Concluído! ${status.processed_count} registros.`);
-                        setUploadProgress(100);
-
-                        // Refresh data - reset filters and force reload
-                        setDateRange(undefined);
-                        setStats(null);
-                        setPage(1);
-                        setRefreshKey(k => k + 1); // Force useEffect to fire even if other deps unchanged
-
-                        // Reset UI after short delay
-                        setTimeout(() => {
-                            setUploading(false);
-                            setUploadMessage("");
-                            setUploadProgress(0);
-                        }, 1500);
-                    } else if (status.status === 'error') {
-                        if (pollingRef.current) {
-                            clearInterval(pollingRef.current);
-                            pollingRef.current = null;
-                        }
-                        setUploading(false);
-                        setUploadMessage("");
-                        setUploadProgress(0);
-                        alert(`Erro no processamento: ${status.error}`);
-                    }
-                } catch (err) {
-                    console.error("Polling error", err);
-                    pollFailCount++;
-                    if (pollFailCount >= 5) {
-                        if (pollingRef.current) {
-                            clearInterval(pollingRef.current);
-                            pollingRef.current = null;
-                        }
-                        setUploading(false);
-                        setUploadMessage("");
-                        setUploadProgress(0);
-                        alert("Falha ao verificar status do upload. Recarregue a página.");
-                    }
-                }
-            }, 3000);
+            startPolling();
 
         } catch (error: any) {
             setUploading(false);
