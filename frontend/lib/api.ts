@@ -73,7 +73,8 @@ export interface UploadStatus {
 
 export interface Me {
     id: number;
-    email: string;
+    username: string;
+    email?: string;
     full_name?: string;
     role: string;
     can_generate_report: boolean;
@@ -202,7 +203,8 @@ export const generateReport = async (
 
 export interface AdminUser {
     id: number;
-    email: string;
+    username?: string;
+    email?: string;
     full_name?: string;
     role: string;
     can_generate_report: boolean;

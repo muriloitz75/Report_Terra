@@ -82,6 +82,29 @@ try:
 except Exception:
     pass  # Column already exists
 
+# Migrate: add username column to users if missing
+try:
+    from sqlalchemy import text as sa_text
+    with engine.connect() as conn:
+        # Add column (nullable first so existing rows don't violate constraint)
+        conn.execute(sa_text("ALTER TABLE users ADD COLUMN username VARCHAR"))
+        conn.commit()
+except Exception:
+    pass  # Column already exists
+
+# Backfill username from email for existing users that don't have one
+try:
+    from sqlalchemy import text as sa_text
+    with engine.connect() as conn:
+        conn.execute(sa_text(
+            "UPDATE users SET username = SPLIT_PART(email, '@', 1) "
+            "WHERE username IS NULL AND email IS NOT NULL"
+        ))
+        conn.commit()
+except Exception:
+    pass  # Ignore if already done or different DB dialect
+
+
 # Migrate: add approval_status column to users if missing
 try:
     from sqlalchemy import text as sa_text
@@ -185,14 +208,17 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
                 detail="Could not validate credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        email: str = payload.get("sub")
-        if email is None:
-            logger.warning("Token validation failed: Missing email (sub) in payload")
+        sub: str = payload.get("sub")
+        if sub is None:
+            logger.warning("Token validation failed: Missing sub in payload")
             raise HTTPException(status_code=401, detail="Invalid token payload")
-            
-        user = db.query(User).filter(User.email == email).first()
+
+        # Look up by username first, then by email (backward compat)
+        user = db.query(User).filter(User.username == sub).first()
+        if not user:
+            user = db.query(User).filter(User.email == sub).first()
         if user is None:
-            logger.warning(f"Token validation failed: User {email} not found in DB")
+            logger.warning(f"Token validation failed: User {sub} not found in DB")
             raise HTTPException(status_code=401, detail="User not found")
         
         # Verifica se o usuário está ativo
@@ -223,6 +249,7 @@ def require_view_permission(user: User, perm_attr: str, detail: str):
 def get_me(user: User = Depends(get_current_user)):
     return {
         "id": user.id,
+        "username": getattr(user, "username", None) or user.email,
         "email": user.email,
         "full_name": user.full_name,
         "role": getattr(user, "role", "user"),
@@ -243,7 +270,10 @@ async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequ
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent", "")[:200]
 
-    user = db.query(User).filter(User.email == form_data.username).first()
+    # Support login by username (primary) or email (fallback)
+    user = db.query(User).filter(User.username == form_data.username).first()
+    if not user:
+        user = db.query(User).filter(User.email == form_data.username).first()
 
     if not user or not auth.verify_password(form_data.password, user.hashed_password):
         # Registrar tentativa falhada
@@ -271,7 +301,7 @@ async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequ
     access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = auth.create_access_token(
         data={
-            "sub": user.email,
+            "sub": getattr(user, "username", None) or user.email,
             "id": user.id,
             "full_name": user.full_name,
             "role": getattr(user, 'role', 'user'),
@@ -284,22 +314,26 @@ async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequ
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-from pydantic import EmailStr
+import re
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    username: str
     password: str
     full_name: Optional[str] = None
 
 @app.post("/auth/register")
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == user.email).first()
+    # Validate username: only letters, numbers, dots and underscores
+    if not re.match(r'^[a-zA-Z0-9._]{3,30}$', user.username):
+        raise HTTPException(status_code=400, detail="Nome de usuário inválido. Use 3-30 caracteres: letras, números, ponto ou underline.")
+
+    db_user = db.query(User).filter(User.username == user.username).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
+        raise HTTPException(status_code=400, detail="Nome de usuário já cadastrado")
+
     hashed_password = auth.get_password_hash(user.password)
     new_user = User(
-        email=user.email,
+        username=user.username,
         hashed_password=hashed_password,
         full_name=user.full_name,
         is_active=False,
@@ -308,7 +342,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return {"id": new_user.id, "email": new_user.email, "message": "Cadastro solicitado. Aguarde aprovação do administrador."}
+    return {"id": new_user.id, "username": new_user.username, "message": "Cadastro solicitado. Aguarde aprovação do administrador."}
 
 # In-memory DB fallback for legacy code (will be removed later)
 # DB: Dict[str, List[Dict[str, Any]]] = {}

@@ -15,18 +15,20 @@ def create_initial_admin():
     logger.info("Initializing DB session for admin creation...")
     db = SessionLocal()
     try:
+        admin_username = os.getenv("ADMIN_USERNAME", "admin")
         admin_email = os.getenv("ADMIN_EMAIL", "admin@admin.com")
         admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
 
-        logger.info(f"Checking if admin user {admin_email} exists...")
-        existing_admin = db.query(User).filter(User.email == admin_email).first()
+        logger.info(f"Checking if admin user '{admin_username}' exists...")
+        existing_admin = db.query(User).filter(User.username == admin_username).first()
         if existing_admin:
-            logger.info(f"Admin user {admin_email} already exists (ID: {existing_admin.id}). Skipping creation.")
+            logger.info(f"Admin '{admin_username}' already exists (ID: {existing_admin.id}). Skipping creation.")
             return
 
-        logger.info(f"Creating initial admin user: {admin_email}")
+        logger.info(f"Creating initial admin user: {admin_username}")
 
         new_admin = User(
+            username=admin_username,
             email=admin_email,
             hashed_password=auth.get_password_hash(admin_pass),
             full_name="Administrador do Sistema",
@@ -40,7 +42,7 @@ def create_initial_admin():
         )
         db.add(new_admin)
         db.commit()
-        logger.info(f"Successfully created admin user: {admin_email}")
+        logger.info(f"Successfully created admin user: {admin_username}")
     except Exception as e:
         logger.error(f"Error creating admin: {e}")
         db.rollback()

@@ -11,7 +11,7 @@ import { CircleAlert, Loader2 } from "lucide-react"
 
 export default function CadastroPage() {
     const [fullName, setFullName] = useState("")
-    const [email, setEmail] = useState("")
+    const [username, setUsername] = useState("")
     const [password, setPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")
     const [isLoading, setIsLoading] = useState(false)
@@ -34,7 +34,7 @@ export default function CadastroPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    email,
+                    username,
                     password,
                     full_name: fullName || null,
                 }),
@@ -53,7 +53,7 @@ export default function CadastroPage() {
             const data = await res.json().catch(() => null)
             setSuccess(data?.message || "Cadastro solicitado. Aguarde aprovação do administrador.")
             setFullName("")
-            setEmail("")
+            setUsername("")
             setPassword("")
             setConfirmPassword("")
         } catch {
@@ -85,15 +85,16 @@ export default function CadastroPage() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="username">Nome de usuário</Label>
                             <Input
-                                id="email"
-                                type="email"
-                                placeholder="seu@email.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                id="username"
+                                type="text"
+                                placeholder="seunome"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
                                 required
                             />
+                            <p className="text-xs text-slate-500">Apenas letras, números, ponto ou underline. 3-30 caracteres.</p>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="password">Senha</Label>

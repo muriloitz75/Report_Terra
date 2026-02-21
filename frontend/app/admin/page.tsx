@@ -89,7 +89,7 @@ export default function AdminPage() {
     };
 
     const handleDeactivate = async (user: AdminUser) => {
-        if (!confirm(`Desativar o usuário ${user.email}?`)) return;
+        if (!confirm(`Desativar o usuário ${user.username || user.email}?`)) return;
         setUpdatingId(user.id);
         try {
             await deactivateAdminUser(user.id);
@@ -102,7 +102,7 @@ export default function AdminPage() {
     };
 
     const handleActivate = async (user: AdminUser) => {
-        if (!confirm(`Reativar o usuário ${user.email}?`)) return;
+        if (!confirm(`Reativar o usuário ${user.username || user.email}?`)) return;
         setUpdatingId(user.id);
         try {
             await updateAdminUser(user.id, { is_active: true });
@@ -115,7 +115,7 @@ export default function AdminPage() {
     };
 
     const handleDeleteUser = async (user: AdminUser) => {
-        if (!confirm(`ATENÇÃO: Excluir permanentemente o usuário ${user.email}?\n\nTodos os dados associados (processos, relatórios, atividades) serão removidos.\n\nEsta ação não pode ser desfeita.`)) return;
+        if (!confirm(`ATENÇÃO: Excluir permanentemente o usuário ${user.username || user.email}?\n\nTodos os dados associados (processos, relatórios, atividades) serão removidos.\n\nEsta ação não pode ser desfeita.`)) return;
         setUpdatingId(user.id);
         try {
             await deleteAdminUser(user.id);
@@ -130,7 +130,7 @@ export default function AdminPage() {
     const pendingUsers = users.filter(u => (u.approval_status || 'approved') === 'pending');
 
     const handleApprove = async (user: AdminUser) => {
-        if (!confirm(`Aprovar o cadastro de ${user.email}?`)) return;
+        if (!confirm(`Aprovar o cadastro de ${user.username || user.email}?`)) return;
         setUpdatingId(user.id);
         try {
             const updated = await updateAdminUser(user.id, { approval_status: 'approved', is_active: true });
@@ -143,7 +143,7 @@ export default function AdminPage() {
     };
 
     const handleReject = async (user: AdminUser) => {
-        if (!confirm(`Reprovar o cadastro de ${user.email}?`)) return;
+        if (!confirm(`Reprovar o cadastro de ${user.username || user.email}?`)) return;
         setUpdatingId(user.id);
         try {
             const updated = await updateAdminUser(user.id, { approval_status: 'rejected', is_active: false });
@@ -202,7 +202,7 @@ export default function AdminPage() {
                         {pendingUsers.map(user => (
                             <div key={user.id} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                                 <div className="min-w-0">
-                                    <p className="font-medium text-slate-800 dark:text-slate-100 truncate">{user.email}</p>
+                                    <p className="font-medium text-slate-800 dark:text-slate-100 truncate">{user.username || user.email}</p>
                                     <p className="text-xs text-slate-500 truncate">{user.full_name || "Sem nome"}</p>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
@@ -263,20 +263,19 @@ export default function AdminPage() {
                                         <tr key={user.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                                             <td className="px-4 py-3">
                                                 <div>
-                                                    <p className="font-medium text-slate-800 dark:text-slate-100">{user.email}</p>
+                                                    <p className="font-medium text-slate-800 dark:text-slate-100">{user.username || user.email}</p>
                                                     {user.full_name && <p className="text-xs text-slate-500">{user.full_name}</p>}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <button
                                                     onClick={() => handleToggleRole(user)}
-                                                    disabled={updatingId === user.id || user.email === (session?.user?.email)}
-                                                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                                                        user.role === 'admin'
+                                                    disabled={updatingId === user.id || (user.username || user.email) === (session?.user?.email)}
+                                                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${user.role === 'admin'
                                                             ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200'
                                                             : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200'
-                                                    }`}
-                                                    title={user.email === (session?.user?.email) ? "Não é possível alterar seu próprio papel" : "Clique para alternar papel"}
+                                                        }`}
+                                                    title={(user.username || user.email) === (session?.user?.email) ? "Não é possível alterar seu próprio papel" : "Clique para alternar papel"}
                                                 >
                                                     {updatingId === user.id ? <Loader2 className="w-3 h-3 animate-spin" /> : user.role === 'admin' ? 'Admin' : 'Usuário'}
                                                 </button>
@@ -312,16 +311,14 @@ export default function AdminPage() {
                                                 <button
                                                     onClick={() => handleTogglePermission(user)}
                                                     disabled={updatingId === user.id || user.role === 'admin' || user.can_view_reports === false}
-                                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                                                        user.can_generate_report || user.role === 'admin'
+                                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${user.can_generate_report || user.role === 'admin'
                                                             ? 'bg-green-500'
                                                             : 'bg-slate-200 dark:bg-slate-700'
-                                                    }`}
+                                                        }`}
                                                     title={user.role === 'admin' ? 'Admins sempre têm acesso' : user.can_view_reports === false ? 'Habilite visualização primeiro' : 'Clique para alternar'}
                                                 >
-                                                    <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transform transition-transform ${
-                                                        user.can_generate_report || user.role === 'admin' ? 'translate-x-4.5' : 'translate-x-0.5'
-                                                    }`} style={{ transform: (user.can_generate_report || user.role === 'admin') ? 'translateX(18px)' : 'translateX(2px)' }} />
+                                                    <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transform transition-transform ${user.can_generate_report || user.role === 'admin' ? 'translate-x-4.5' : 'translate-x-0.5'
+                                                        }`} style={{ transform: (user.can_generate_report || user.role === 'admin') ? 'translateX(18px)' : 'translateX(2px)' }} />
                                                 </button>
                                             </td>
                                             <td className="px-4 py-3 text-center">
@@ -334,11 +331,10 @@ export default function AdminPage() {
                                                         Reprovado
                                                     </span>
                                                 ) : (
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                        user.is_active
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${user.is_active
                                                             ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                                                             : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500'
-                                                    }`}>
+                                                        }`}>
                                                         {user.is_active ? 'Ativo' : 'Inativo'}
                                                     </span>
                                                 )}

@@ -12,7 +12,7 @@ import { CircleAlert, Loader2, WifiOff } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function LoginPage() {
-    const [email, setEmail] = useState("")
+    const [username, setUsername] = useState("")
     const [password, setPassword] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -30,12 +30,12 @@ export default function LoginPage() {
             const tokenRes = await fetch("/token", {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: new URLSearchParams({ username: email, password }),
+                body: new URLSearchParams({ username, password }),
                 signal: AbortSignal.timeout(5000),
             })
 
             if (tokenRes.status === 401) {
-                setError("Email ou senha incorretos.")
+                setError("Usuário ou senha incorretos.")
                 setErrorType("auth")
                 setIsLoading(false)
                 return
@@ -64,7 +64,7 @@ export default function LoginPage() {
 
             // 2. Token obtido com sucesso — criar sessão NextAuth passando o token já validado
             const result = await signIn("credentials", {
-                email,
+                email: username,
                 password: "__token__",
                 accessToken: tokenData.access_token,
                 redirect: false,
@@ -97,13 +97,13 @@ export default function LoginPage() {
                 <CardContent>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="username">Usuário</Label>
                             <Input
-                                id="email"
-                                type="email"
-                                placeholder="seu@email.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                id="username"
+                                type="text"
+                                placeholder="seunome"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
                                 required
                             />
                         </div>
