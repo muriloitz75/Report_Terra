@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { getStats, KPIStats } from '@/lib/api';
+import { getStats, KPIStats, getUploadStatus } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, AlertCircle, CheckCircle, Clock, LayoutDashboard } from 'lucide-react';
+import { FileText, AlertCircle, CheckCircle, Clock, LayoutDashboard, RefreshCw } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
@@ -21,6 +21,8 @@ function DashboardContent() {
     const [stats, setStats] = useState<KPIStats | null>(null);
     const [loading, setLoading] = useState(false);
     const [dbLoaded, setDbLoaded] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [isCheckingUpload, setIsCheckingUpload] = useState(true);
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const { data: session, status } = useSession();
     const router = useRouter();
@@ -33,6 +35,7 @@ function DashboardContent() {
     }, [router, status, canViewProcesses, canViewDashboard, canViewReports]);
 
     const loadData = async () => {
+        if (isCheckingUpload || uploading) return;
         setLoading(true);
         try {
             const from = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
@@ -50,9 +53,28 @@ function DashboardContent() {
         }
     };
 
+    // Check for ongoing background upload on mount
+    useEffect(() => {
+        if (status === 'loading' || !canViewDashboard) return;
+
+        const checkUpload = async () => {
+            try {
+                const res = await getUploadStatus();
+                if (res.status === 'processing') {
+                    setUploading(true);
+                }
+            } catch (e) {
+                console.error("Não foi possível verificar status de upload no dashboard", e);
+            } finally {
+                setIsCheckingUpload(false);
+            }
+        };
+        checkUpload();
+    }, [status, canViewDashboard]);
+
     useEffect(() => {
         loadData();
-    }, [dateRange]);
+    }, [dateRange, isCheckingUpload, uploading]);
 
     return (
         <div className="p-8 space-y-8 font-sans">
@@ -76,7 +98,18 @@ function DashboardContent() {
                 </div>
             </header>
 
-            {!dbLoaded && !loading && (
+            {isCheckingUpload ? (
+                <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/50">
+                    <Clock className="w-12 h-12 text-slate-400 mb-4 animate-spin" />
+                    <h3 className="text-lg font-semibold text-slate-700">Verificando banco de dados...</h3>
+                </div>
+            ) : uploading ? (
+                <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-blue-300 rounded-xl bg-blue-50/50">
+                    <RefreshCw className="w-12 h-12 text-blue-500 mb-4 animate-spin" />
+                    <h3 className="text-lg font-semibold text-slate-700">Atualização em Progresso</h3>
+                    <p className="text-slate-500 mb-4">Um novo PDF está sendo processado em segundo plano. Os dados do Dashboard estarão disponíveis assim que a substituição terminar na tela de Processos.</p>
+                </div>
+            ) : !dbLoaded && !loading ? (
                 <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-300 rounded-xl bg-slate-50/50">
                     <FileText className="w-12 h-12 text-slate-400 mb-4" />
                     <h3 className="text-lg font-semibold text-slate-700">Nenhum dado encontrado</h3>
@@ -85,9 +118,9 @@ function DashboardContent() {
                         <a href="/processos">Ir para Processos</a>
                     </Button>
                 </div>
-            )}
+            ) : null}
 
-            {stats && (
+            {!isCheckingUpload && !uploading && stats && (
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in zoom-in duration-500">
                     <Card className="border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -138,7 +171,7 @@ function DashboardContent() {
                 </div>
             )}
 
-            {stats && (
+            {!isCheckingUpload && !uploading && stats && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <Card className="shadow-sm">
                         <CardHeader>
