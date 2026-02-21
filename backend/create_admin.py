@@ -1,39 +1,54 @@
-from database import SessionLocal, engine
-from models import Base, User
-from auth import get_password_hash
+import os
 import sys
+import logging
+from dotenv import load_dotenv
 
-def create_admin(email, password, full_name):
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+def create_initial_admin():
+    from database import SessionLocal
+    from models import User
+    import auth
+
+    logger.info("Initializing DB session for admin creation...")
     db = SessionLocal()
     try:
-        # Check if user exists
-        existing_user = db.query(User).filter(User.email == email).first()
-        if existing_user:
-            print(f"Erro: Usuário {email} já existe.")
+        admin_email = os.getenv("ADMIN_EMAIL", "admin@admin.com")
+        admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
+
+        logger.info(f"Checking if admin user {admin_email} exists...")
+        existing_admin = db.query(User).filter(User.email == admin_email).first()
+        if existing_admin:
+            logger.info(f"Admin user {admin_email} already exists (ID: {existing_admin.id}). Skipping creation.")
             return
 
-        hashed_password = get_password_hash(password)
-        new_user = User(
-            email=email,
-            hashed_password=hashed_password,
-            full_name=full_name,
-            is_active=True
+        logger.info(f"Creating initial admin user: {admin_email}")
+
+        new_admin = User(
+            email=admin_email,
+            hashed_password=auth.get_password_hash(admin_pass),
+            full_name="Administrador do Sistema",
+            role="admin",
+            is_active=True,
+            approval_status="approved",
+            can_generate_report=True,
+            can_view_processes=True,
+            can_view_dashboard=True,
+            can_view_reports=True,
         )
-        db.add(new_user)
+        db.add(new_admin)
         db.commit()
-        print(f"Sucesso! Usuário administrador criado: {email}")
-        print(f"Senha: {password}")
+        logger.info(f"Successfully created admin user: {admin_email}")
     except Exception as e:
-        print(f"Erro ao criar usuário: {e}")
+        logger.error(f"Error creating admin: {e}")
+        db.rollback()
     finally:
         db.close()
+        logger.info("DB session closed after admin creation attempt.")
+
 
 if __name__ == "__main__":
-    print("--- Criar Usuário Administrador ---")
-    if len(sys.argv) == 4:
-        create_admin(sys.argv[1], sys.argv[2], sys.argv[3])
-    else:
-        email = input("Email: ")
-        password = input("Senha: ")
-        full_name = input("Nome Completo: ")
-        create_admin(email, password, full_name)
+    load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+    create_initial_admin()
