@@ -298,22 +298,11 @@ export default function ProcessosPage() {
 
             {(isCheckingUpload || uploading) && (
                 <div className="flex flex-col items-center justify-center p-20 mt-10 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-900/50 animate-in fade-in zoom-in duration-500">
-                    <style>{`
-                        @keyframes gallop {
-                            0%, 100% { transform: translateY(0) rotate(0deg); }
-                            25% { transform: translateY(-8px) rotate(-5deg); }
-                            50% { transform: translateY(-12px) rotate(0deg); }
-                            75% { transform: translateY(-8px) rotate(5deg); }
-                        }
-                        .horse-gallop {
-                            animation: gallop 0.4s infinite linear;
-                            display: inline-block;
-                        }
-                    `}</style>
-                    <div className="text-7xl mb-6 flex items-center justify-center">
-                        <span className="horse-gallop">🐎</span>
-                        <span className="animate-pulse ml-2 text-5xl origin-left">💨</span>
-                    </div>
+                    <img
+                        src="/gifs/sonic.gif"
+                        alt="Carregando..."
+                        className="w-32 h-auto mb-6 object-contain"
+                    />
                     <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-300">
                         {isCheckingUpload ? "Avaliando base de dados..." : "Atualização em Progresso"}
                     </h3>
