@@ -1,8 +1,10 @@
 # Dependencies
-.venv/
-__pycache__/
-*.py[cod]
-*$py.class
+.venv/backend/report_terra.db
+backend/data/
+backend/backend_debug.log
+backend_log.txt
+*.sqlite3
+*.db
 *.so
 .Python
 .venv/
