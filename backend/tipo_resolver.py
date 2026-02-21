@@ -88,3 +88,4 @@ def resolve_tipo(raw: str) -> str:
 
     # Phase 3: No confident match — keep original to avoid wrong substitution
     return raw
+

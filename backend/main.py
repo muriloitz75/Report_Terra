@@ -277,10 +277,8 @@ async def login_for_access_token(request: Request, form_data: OAuth2PasswordRequ
     ip_address = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent", "")[:200]
 
-    # Support login by username (primary) or email (fallback)
+    # Support login by username only
     user = db.query(User).filter(User.username == form_data.username).first()
-    if not user:
-        user = db.query(User).filter(User.email == form_data.username).first()
 
     if not user or not auth.verify_password(form_data.password, user.hashed_password):
         # Registrar tentativa falhada
@@ -412,10 +410,16 @@ def process_pdf_background(tmp_path: str, user_id: int):
         
         # N+1 Query Optimization: bulk-load existing records to avoid querying inside the loop
         extracted_ids = [item['id'] for item in data]
-        existing_procs = db.query(Process).filter(
-            Process.user_id == user_id, 
-            Process.id.in_(extracted_ids)
-        ).all()
+        existing_procs = []
+        # SQLite has a limit on SQL variables (usually 999), so we chunk the IN clause
+        chunk_size = 500
+        for i in range(0, len(extracted_ids), chunk_size):
+            chunk = extracted_ids[i:i + chunk_size]
+            existing_procs.extend(db.query(Process).filter(
+                Process.user_id == user_id, 
+                Process.id.in_(chunk)
+            ).all())
+        
         existing_dict = {p.id: p for p in existing_procs}
         
         for i, item in enumerate(data):

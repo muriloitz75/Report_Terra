@@ -41,7 +41,7 @@ def parse_pdf(pdf_path, progress_callback=None):
 
     STATUS_KEYWORDS = [
         "ANDAMENTO", "ENCERRAMENTO", "DEFERIDO", "INDEFERIDO",
-        "SUSPENSO", "CANCELADO", "RETORNO", "EM DILIGENCIA", "PENDENCIA"
+        "SUSPENSO", "CANCELADO", "RETORNO", "EM DILIGENCIA", "PENDENCIA", "AGUARDANDO PAGAMENTO"
     ]
 
     # Column X boundaries derived from PDF header row bounding-box analysis
