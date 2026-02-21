@@ -66,6 +66,13 @@ import auth
 # Create tables (new tables auto-created, existing tables need manual migration)
 Base.metadata.create_all(bind=engine)
 
+# Seed initial admin if not exists (helpful for fresh deployments)
+try:
+    from create_admin import create_initial_admin
+    create_initial_admin()
+except Exception as e:
+    logger.error(f"Failed to seed initial admin: {e}")
+
 # Migrate: add last_login column to users if missing
 try:
     from sqlalchemy import text as sa_text
