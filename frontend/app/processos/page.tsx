@@ -174,6 +174,10 @@ export default function ProcessosPage() {
         setUploadMessage("Enviando arquivo...");
         setUploadProgress(5);
 
+        // Optimistic UI Update: Ocultar registros antigos instantaneamente
+        setProcesses(null);
+        setStats(null);
+
         try {
             // 1. Send File (Returns immediately with 200/202)
             await uploadPDF(file);
