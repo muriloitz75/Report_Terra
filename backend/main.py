@@ -408,9 +408,18 @@ def process_pdf_background(tmp_path: str, user_id: int):
         from models import Process
         from datetime import datetime
 
-        BATCH_SIZE = 50
+        BATCH_SIZE = 500
+        
+        # N+1 Query Optimization: bulk-load existing records to avoid querying inside the loop
+        extracted_ids = [item['id'] for item in data]
+        existing_procs = db.query(Process).filter(
+            Process.user_id == user_id, 
+            Process.id.in_(extracted_ids)
+        ).all()
+        existing_dict = {p.id: p for p in existing_procs}
+        
         for i, item in enumerate(data):
-            existing = db.query(Process).filter(Process.user_id == user_id, Process.id == item['id']).first()
+            existing = existing_dict.get(item['id'])
 
             if existing:
                  existing.contribuinte = item['contribuinte']
@@ -441,7 +450,6 @@ def process_pdf_background(tmp_path: str, user_id: int):
 
             # Commit in batches and update progress
             if (i + 1) % BATCH_SIZE == 0 or (i + 1) == total:
-                db.commit()
                 db.commit()
                 # Scale saving progress from 20% to 100%
                 pct = int(20 + ((i + 1) / total) * 80)

@@ -208,6 +208,9 @@ def parse_pdf(pdf_path, progress_callback=None):
                     "dias_atraso_calc": days_since_entry - DELAY_THRESHOLD_DAYS if is_delayed else 0,
                     "is_atrasado": is_delayed
                 })
+            
+            # Free memory used by this page data to prevent OOM on large PDFs
+            page.flush_cache()
 
     # tipo_solicitacao is already resolved and preserved in canonical form by resolve_tipo
 
