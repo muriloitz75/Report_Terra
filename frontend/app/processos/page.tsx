@@ -308,7 +308,7 @@ export default function ProcessosPage() {
                     </h3>
                     <p className="text-slate-500 mt-2 text-center max-w-md">
                         {uploading
-                            ? "Segura o cavalinho! 🤠 O PDF está sendo processado a toda velocidade nos bastidores da aplicação..."
+                            ? "O PDF está sendo processado a toda velocidade nos bastidores da aplicação..."
                             : "Estamos conferindo se há alguma atividade nos bastidores, só um instante..."}
                     </p>
                 </div>
