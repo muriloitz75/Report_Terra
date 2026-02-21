@@ -97,7 +97,7 @@ try:
     from sqlalchemy import text as sa_text
     with engine.connect() as conn:
         conn.execute(sa_text(
-            "UPDATE users SET username = SPLIT_PART(email, '@', 1) "
+            "UPDATE users SET username = SUBSTR(email, 1, INSTR(email, '@') - 1) "
             "WHERE username IS NULL AND email IS NOT NULL"
         ))
         conn.commit()

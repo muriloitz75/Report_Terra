@@ -64,7 +64,7 @@ export default function LoginPage() {
 
             // 2. Token obtido com sucesso — criar sessão NextAuth passando o token já validado
             const result = await signIn("credentials", {
-                email: username,
+                username,
                 password: "__token__",
                 accessToken: tokenData.access_token,
                 redirect: false,
