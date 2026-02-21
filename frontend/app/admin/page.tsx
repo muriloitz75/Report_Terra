@@ -11,7 +11,7 @@ import { getAdminUsers, updateAdminUser, deactivateAdminUser, deleteAdminUser, A
 export default function AdminPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
-    const isAdmin = (session?.user as { role?: string })?.role === 'admin';
+    const isAdmin = (session as any)?.role === 'admin';
 
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [loading, setLoading] = useState(true);
