@@ -408,49 +408,26 @@ def process_pdf_background(tmp_path: str, user_id: int):
 
         BATCH_SIZE = 500
         
-        # N+1 Query Optimization: bulk-load existing records to avoid querying inside the loop
-        extracted_ids = [item['id'] for item in data]
-        existing_procs = []
-        # SQLite has a limit on SQL variables (usually 999), so we chunk the IN clause
-        chunk_size = 500
-        for i in range(0, len(extracted_ids), chunk_size):
-            chunk = extracted_ids[i:i + chunk_size]
-            existing_procs.extend(db.query(Process).filter(
-                Process.user_id == user_id, 
-                Process.id.in_(chunk)
-            ).all())
-        
-        existing_dict = {p.id: p for p in existing_procs}
+        # Limpar todos os registros antigos do usuário antes de inserir os novos (Auto-Replace)
+        user_state["message"] = "Limpando registros antigos..."
+        db.query(Process).filter(Process.user_id == user_id).delete()
+        db.commit()
         
         for i, item in enumerate(data):
-            existing = existing_dict.get(item['id'])
-
-            if existing:
-                 existing.contribuinte = item['contribuinte']
-                 existing.data_abertura = item['data_abertura']
-                 existing.ano = item['ano']
-                 existing.status = item['status']
-                 existing.setor_atual = item['setor_atual']
-                 existing.tipo_solicitacao = item['tipo_solicitacao']
-                 existing.dias_atraso_pdf = item['dias_atraso_pdf']
-                 existing.dias_atraso_calc = item['dias_atraso_calc']
-                 existing.is_atrasado = item['is_atrasado']
-                 existing.updated_at = datetime.utcnow()
-            else:
-                new_process = Process(
-                    id=item['id'],
-                    user_id=user_id,
-                    contribuinte=item['contribuinte'],
-                    data_abertura=item['data_abertura'],
-                    ano=item['ano'],
-                    status=item['status'],
-                    setor_atual=item['setor_atual'],
-                    tipo_solicitacao=item['tipo_solicitacao'],
-                    dias_atraso_pdf=item['dias_atraso_pdf'],
-                    dias_atraso_calc=item['dias_atraso_calc'],
-                    is_atrasado=item['is_atrasado']
-                )
-                db.add(new_process)
+            new_process = Process(
+                id=item['id'],
+                user_id=user_id,
+                contribuinte=item['contribuinte'],
+                data_abertura=item['data_abertura'],
+                ano=item['ano'],
+                status=item['status'],
+                setor_atual=item['setor_atual'],
+                tipo_solicitacao=item['tipo_solicitacao'],
+                dias_atraso_pdf=item['dias_atraso_pdf'],
+                dias_atraso_calc=item['dias_atraso_calc'],
+                is_atrasado=item['is_atrasado']
+            )
+            db.add(new_process)
 
             # Commit in batches and update progress
             if (i + 1) % BATCH_SIZE == 0 or (i + 1) == total:
