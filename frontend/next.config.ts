@@ -17,6 +17,12 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: 60,
   },
 
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '100mb',
+    },
+  },
+
   // Proxy para a API do backend
   async rewrites() {
     const apiUrl = process.env.BACKEND_API_URL || 'http://127.0.0.1:8000';

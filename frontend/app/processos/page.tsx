@@ -171,7 +171,9 @@ export default function ProcessosPage() {
                 alert("Já existe um arquivo sendo processado. Por favor, aguarde.");
             } else {
                 console.error(error);
-                alert("Erro ao enviar arquivo PDF");
+                const statusCode = error.response?.status || 'Desconhecido';
+                const errMsg = error.message || 'Sem detalhes';
+                alert(`Erro ao enviar arquivo PDF.\nServidor retornou: Status ${statusCode} (${errMsg})\nSe o erro for 413, o arquivo é grande demais para a configuração atual.`);
             }
         }
     };
