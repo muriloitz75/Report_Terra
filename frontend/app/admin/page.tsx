@@ -11,7 +11,7 @@ import { getAdminUsers, updateAdminUser, deactivateAdminUser, deleteAdminUser, A
 export default function AdminPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
-    const isAdmin = (session as any)?.role === 'admin';
+    const isAdmin = (session?.user as { role?: string })?.role === 'admin';
 
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [loading, setLoading] = useState(true);
@@ -36,8 +36,9 @@ export default function AdminPage() {
                 console.error('[Admin] Unexpected API response:', typeof data, data);
                 setError('Resposta inesperada da API. Tente recarregar.');
             }
-        } catch (e: any) {
-            const msg = e?.response?.data?.detail || e?.message || 'Erro desconhecido';
+        } catch (e: unknown) {
+            const err = e as { response?: { data?: { detail?: string } }, message?: string };
+            const msg = err?.response?.data?.detail || err?.message || 'Erro desconhecido';
             setError(`Erro ao carregar usuários: ${msg}`);
         } finally {
             setLoading(false);
@@ -63,11 +64,11 @@ export default function AdminPage() {
     };
 
     const handleToggleView = async (user: AdminUser, field: 'can_view_processes' | 'can_view_dashboard' | 'can_view_reports') => {
-        const current = (user as any)[field] !== false;
+        const current = user[field] !== false;
         setUpdatingId(user.id);
         try {
-            await updateAdminUser(user.id, { [field]: !current } as any);
-            setUsers(prev => prev.map(u => u.id === user.id ? { ...(u as any), [field]: !current } : u));
+            await updateAdminUser(user.id, { [field]: !current });
+            setUsers(prev => prev.map(u => u.id === user.id ? { ...u, [field]: !current } : u));
         } catch {
             setError('Erro ao atualizar permissão.');
         } finally {
@@ -120,8 +121,9 @@ export default function AdminPage() {
         try {
             await deleteAdminUser(user.id);
             setUsers(prev => prev.filter(u => u.id !== user.id));
-        } catch (e: any) {
-            setError(e?.response?.data?.detail || 'Erro ao excluir usuário.');
+        } catch (e) {
+            const err = e as { response?: { data?: { detail?: string } } };
+            setError(err?.response?.data?.detail || 'Erro ao excluir usuário permanentemente.');
         } finally {
             setUpdatingId(null);
         }
@@ -135,8 +137,9 @@ export default function AdminPage() {
         try {
             const updated = await updateAdminUser(user.id, { approval_status: 'approved', is_active: true });
             setUsers(prev => prev.map(u => u.id === user.id ? { ...u, ...updated } : u));
-        } catch (e: any) {
-            setError(e?.response?.data?.detail || 'Erro ao aprovar usuário.');
+        } catch (e) {
+            const err = e as { response?: { data?: { detail?: string } } };
+            setError(err?.response?.data?.detail || 'Erro ao aprovar usuário.');
         } finally {
             setUpdatingId(null);
         }
@@ -148,8 +151,9 @@ export default function AdminPage() {
         try {
             const updated = await updateAdminUser(user.id, { approval_status: 'rejected', is_active: false });
             setUsers(prev => prev.map(u => u.id === user.id ? { ...u, ...updated } : u));
-        } catch (e: any) {
-            setError(e?.response?.data?.detail || 'Erro ao reprovar usuário.');
+        } catch (e) {
+            const err = e as { response?: { data?: { detail?: string } } };
+            setError(err?.response?.data?.detail || 'Erro ao reprovar usuário.');
         } finally {
             setUpdatingId(null);
         }
@@ -272,8 +276,8 @@ export default function AdminPage() {
                                                     onClick={() => handleToggleRole(user)}
                                                     disabled={updatingId === user.id || (user.username || user.email) === (session?.user?.email)}
                                                     className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${user.role === 'admin'
-                                                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200'
-                                                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200'
+                                                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200'
+                                                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200'
                                                         }`}
                                                     title={(user.username || user.email) === (session?.user?.email) ? "Não é possível alterar seu próprio papel" : "Clique para alternar papel"}
                                                 >
@@ -312,8 +316,8 @@ export default function AdminPage() {
                                                     onClick={() => handleTogglePermission(user)}
                                                     disabled={updatingId === user.id || user.role === 'admin' || user.can_view_reports === false}
                                                     className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${user.can_generate_report || user.role === 'admin'
-                                                            ? 'bg-green-500'
-                                                            : 'bg-slate-200 dark:bg-slate-700'
+                                                        ? 'bg-green-500'
+                                                        : 'bg-slate-200 dark:bg-slate-700'
                                                         }`}
                                                     title={user.role === 'admin' ? 'Admins sempre têm acesso' : user.can_view_reports === false ? 'Habilite visualização primeiro' : 'Clique para alternar'}
                                                 >
@@ -332,8 +336,8 @@ export default function AdminPage() {
                                                     </span>
                                                 ) : (
                                                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${user.is_active
-                                                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                            : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500'
+                                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500'
                                                         }`}>
                                                         {user.is_active ? 'Ativo' : 'Inativo'}
                                                     </span>
