@@ -1006,6 +1006,7 @@ def admin_list_users(admin: User = Depends(get_admin_user), db: Session = Depend
     return [
         {
             "id": u.id,
+            "username": getattr(u, 'username', None),
             "email": u.email,
             "full_name": u.full_name,
             "role": getattr(u, 'role', 'user'),
@@ -1045,6 +1046,7 @@ def admin_update_user(user_id: int, update: UserUpdate, admin: User = Depends(ge
     db.refresh(user)
     return {
         "id": user.id,
+        "username": getattr(user, 'username', None),
         "email": user.email,
         "full_name": user.full_name,
         "role": getattr(user, 'role', 'user'),
