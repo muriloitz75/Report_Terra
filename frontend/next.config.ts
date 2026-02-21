@@ -21,6 +21,7 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '100mb',
     },
+    middlewareClientMaxBodySize: '100mb',
   },
 
   // Proxy para a API do backend
