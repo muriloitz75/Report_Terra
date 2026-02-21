@@ -41,54 +41,43 @@ O **Report Terra** é uma aplicação web para extrair, analisar e visualizar da
 | LangChain + OpenAI | — | Geração de relatórios com IA |
 | Uvicorn | 0.32 | Servidor ASGI |
 
-## 📦 Como Executar
+## 📦 Como Executar (Windows)
 
 ### Pré-requisitos
-- **Node.js** v20+
-- **Python** v3.10+
-- **OpenAI API Key** (opcional, para relatórios IA)
+- **Node.js** v20+ → [nodejs.org](https://nodejs.org)
+- **Python** v3.10+ → [python.org](https://python.org) *(marque "Add Python to PATH" na instalação)*
 
-### 🚀 Forma Rápida (Windows)
+---
 
-Clique duas vezes no **`iniciar_projeto.bat`** na raiz do projeto. Ele abrirá Backend e Frontend automaticamente em janelas separadas.
+### Passo 1 — Setup inicial (apenas na primeira vez)
 
-### Execução Manual
+Clique duas vezes em **`setup.bat`**. Ele irá automaticamente:
+- ✅ Verificar se Python e Node.js estão instalados
+- ✅ Criar o ambiente virtual `.venv` e instalar dependências Python
+- ✅ Instalar dependências npm do frontend
+- ✅ Criar o arquivo `frontend/.env.local`
+- ✅ Criar o banco de dados e usuário admin padrão
 
-#### 1. Backend (API)
+> **Login padrão após o setup:** usuário `admin` / senha `admin123`
 
-```bash
-# Na pasta raiz do projeto
-python -m venv .venv
-.venv\Scripts\activate
+### Passo 2 — Iniciar o projeto
 
-# Instalar dependências
-pip install -r requirements.txt
+Clique duas vezes em **`iniciar_projeto.bat`**. Abrirá duas janelas (Backend e Frontend).
 
-# Iniciar servidor (http://localhost:8000)
-python -m backend.main
-```
+| Serviço | Endereço |
+|---|---|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8000 |
+| Documentação API | http://localhost:8000/docs |
 
-#### 2. Frontend (Interface)
+---
 
-```bash
-# Em outro terminal, na pasta frontend/
-cd frontend
-npm install
-npm run dev
-```
+### (Opcional) Relatórios com IA
 
-Acesse: **http://localhost:3000**
-
-### Variáveis de Ambiente
-
-#### Frontend (`frontend/.env.local`)
+Adicione sua chave no arquivo `frontend/.env.local`:
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-#### Backend (opcional)
-```
-OPENAI_API_KEY=sk-...   # Necessário apenas para relatórios IA
+OPENAI_API_KEY=sk-...
 ```
 
 ## 📂 Estrutura do Projeto
@@ -96,23 +85,37 @@ OPENAI_API_KEY=sk-...   # Necessário apenas para relatórios IA
 ```
 Report_Terra/
 ├── backend/
-│   ├── __init__.py        # Package init
 │   ├── main.py            # Endpoints FastAPI (upload, stats, processos, relatórios)
-│   ├── process_pdf.py     # Parser de PDF (Regex + pdfplumber)
-│   └── ai_agent.py        # Agente IA com LangChain para relatórios
+│   ├── process_pdf.py     # Parser de PDF com bounding-box (pdfplumber)
+│   ├── ai_agent.py        # Agente IA com LangChain para relatórios
+│   ├── database.py        # Configuração SQLAlchemy (SQLite local)
+│   ├── models.py          # Models ORM (User, Processo)
+│   └── auth.py            # JWT + hashing de senhas
 ├── frontend/
 │   ├── app/
-│   │   ├── dashboard/     # Página de KPIs e gráficos
+│   │   ├── dashboard/     # KPIs e gráficos
 │   │   ├── processos/     # Tabela com filtros e paginação
 │   │   └── relatorios/    # Geração de relatórios com IA
 │   ├── components/        # Componentes UI (sidebar, date-picker, etc.)
-│   └── lib/               # API service (Axios) e utilitários
-├── pdf model/             # Arquivo PDF de exemplo para testes
+│   ├── lib/               # API service (Axios) e utilitários
+│   └── .env.local         # Variáveis de ambiente (não commitado)
+├── docs/
+│   └── solucoes/          # 📚 Manual de soluções de erros resolvidos
+│       ├── README.md      # Índice do manual
+│       ├── TEMPLATE.md    # Template para novos registros
+│       ├── setup/         # Erros de configuração e ambiente
+│       ├── pdf/           # Erros no parser de PDF
+│       ├── frontend/      # Erros de frontend e Next.js
+│       └── deploy/        # Erros de Docker e deploy
+├── pdf model/             # PDF de exemplo para testes
 ├── Dockerfile             # Build para deploy em container
 ├── requirements.txt       # Dependências Python
-├── iniciar_projeto.bat    # Script de inicialização (Windows)
+├── setup.bat              # ⭐ Setup inicial (primeira vez após clonar)
+├── iniciar_projeto.bat    # ⭐ Iniciar backend + frontend
 └── README.md
 ```
+
+> 📚 **Encontrou um erro?** Consulte o [Manual de Soluções](docs/solucoes/README.md) antes de debugar do zero.
 
 ## 📝 Regras de Processamento
 

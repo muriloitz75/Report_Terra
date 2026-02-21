@@ -67,18 +67,28 @@ def parse_pdf(pdf_path, progress_callback=None):
                 except Exception:
                     pass
 
-            words = page.extract_words(x_tolerance=3, y_tolerance=3)
+            words = page.extract_words(x_tolerance=3, y_tolerance=5)
             if not words:
                 continue
 
-            # Group words into rows by rounded top position
-            rows = {}
-            for w in words:
-                row_key = round(w["top"])
-                rows.setdefault(row_key, []).append(w)
+            # Group words into logical rows using a tolerance of 6px.
+            # Some PDFs render words of the same row at slightly different
+            # vertical positions (e.g. top=139 vs top=140 for ID vs CPF),
+            # so a simple round() would split them into separate rows.
+            ROW_TOLERANCE = 6
+            row_groups = []   # list of (representative_top, [words])
+            for w in sorted(words, key=lambda w: w["top"]):
+                placed = False
+                for grp in row_groups:
+                    if abs(w["top"] - grp[0]) <= ROW_TOLERANCE:
+                        grp[1].append(w)
+                        placed = True
+                        break
+                if not placed:
+                    row_groups.append((w["top"], [w]))
 
-            for row_key in sorted(rows.keys()):
-                row_words = sorted(rows[row_key], key=lambda w: w["x0"])
+            for _, row_words_unsorted in sorted(row_groups, key=lambda g: g[0]):
+                row_words = sorted(row_words_unsorted, key=lambda w: w["x0"])
 
                 # Assign each word to its column based on x0 position
                 col_id       = []
@@ -116,8 +126,24 @@ def parse_pdf(pdf_path, progress_callback=None):
                 if not id_text or not id_text[0].isdigit():
                     continue
 
+                # --- Clean contribuinte tokens contaminated with date ---
+                # pdfplumber sometimes merges last name word with date, e.g. "PAS13/02/2026"
+                # We strip any trailing date pattern from each contribuinte token.
+                DATE_RE = re.compile(r"\d{2}/\d{2}/\d{4}")
+                cleaned_contrib = []
+                for token in col_contrib:
+                    m = DATE_RE.search(token)
+                    if m:
+                        # keep only the part before the date
+                        clean = token[:m.start()].strip()
+                        if clean:
+                            cleaned_contrib.append(clean)
+                    else:
+                        cleaned_contrib.append(token)
+
                 # Reconstruct fields
-                contribuinte = " ".join(col_contrib).strip()
+                contribuinte = " ".join(cleaned_contrib).strip()
+
                 datas_text   = " ".join(col_datas).strip()
                 status_raw   = " ".join(col_status).strip()
                 setor_atual  = " ".join(col_setor_at).strip()
