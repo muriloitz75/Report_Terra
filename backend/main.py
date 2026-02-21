@@ -96,12 +96,19 @@ except Exception:
 try:
     from sqlalchemy import text as sa_text
     with engine.connect() as conn:
-        conn.execute(sa_text(
-            "UPDATE users SET username = SUBSTR(email, 1, INSTR(email, '@') - 1) "
-            "WHERE username IS NULL AND email IS NOT NULL"
-        ))
-        conn.commit()
-except Exception:
+        dialect = engine.dialect.name
+        if dialect == "sqlite":
+            query = "UPDATE users SET username = SUBSTR(email, 1, INSTR(email, '@') - 1) WHERE username IS NULL AND email IS NOT NULL"
+        elif dialect == "postgresql":
+            query = "UPDATE users SET username = SUBSTR(email, 1, POSITION('@' IN email) - 1) WHERE username IS NULL AND email IS NOT NULL"
+        else:
+            query = None
+            
+        if query:
+            conn.execute(sa_text(query))
+            conn.commit()
+except Exception as e:
+    logger.error(f"Failed to backfill username: {e}")
     pass  # Ignore if already done or different DB dialect
 
 
