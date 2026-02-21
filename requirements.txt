@@ -25,3 +25,6 @@ gunicorn==21.2.0
 python-dotenv==1.0.0
 aiofiles
 requests
+
+# Banco de Dados
+psycopg2-binary>=2.9.9
