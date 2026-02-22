@@ -23,7 +23,7 @@ try:
 except ValueError:
     DELAY_THRESHOLD_DAYS = 30
 
-def parse_pdf(pdf_path, progress_callback=None):
+def parse_pdf(pdf_path, progress_callback=None, cancel_check=None):
     """
     Parse a Sistema Terra PDF report using bounding-box column detection.
 
@@ -61,6 +61,10 @@ def parse_pdf(pdf_path, progress_callback=None):
     with pdfplumber.open(pdf_path) as pdf:
         total_pages = len(pdf.pages)
         for page_idx, page in enumerate(pdf.pages):
+            # Check for cancellation before processing each page
+            if cancel_check and cancel_check():
+                return processes
+
             if progress_callback:
                 try:
                     progress_callback(page_idx + 1, total_pages)

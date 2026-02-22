@@ -128,10 +128,24 @@ export default function ProcessosPage() {
                         clearInterval(pollingRef.current);
                         pollingRef.current = null;
                     }
-                    setUploading(false);
-                    setUploadMessage("");
-                    setUploadProgress(0);
-                    alert(`Erro no processamento: ${status.error}`);
+
+                    const wasCancelled = status.error?.toLowerCase().includes('cancelado');
+
+                    if (wasCancelled) {
+                        // User-initiated cancel: reset cleanly
+                        setUploadMessage("Upload cancelado.");
+                        setUploadProgress(0);
+                        setTimeout(() => {
+                            setUploading(false);
+                            setUploadMessage("");
+                        }, 1500);
+                    } else {
+                        // Genuine error
+                        setUploading(false);
+                        setUploadMessage("");
+                        setUploadProgress(0);
+                        alert(`Erro no processamento: ${status.error}`);
+                    }
                 }
             } catch (err) {
                 console.error("Polling error", err);

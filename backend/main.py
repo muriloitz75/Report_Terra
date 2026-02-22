@@ -394,7 +394,11 @@ def process_pdf_background(tmp_path: str, user_id: int):
             user_state["message"] = f"Extraindo dados... Página {current}/{total} ({pct}%)"
 
         user_state["message"] = "Extraindo dados do PDF... (0%)"
-        data = parse_pdf(tmp_path, progress_callback=extraction_progress)
+
+        def should_cancel():
+            return user_state.get("should_cancel", False)
+
+        data = parse_pdf(tmp_path, progress_callback=extraction_progress, cancel_check=should_cancel)
 
         total = len(data)
         if total == 0:
@@ -408,6 +412,14 @@ def process_pdf_background(tmp_path: str, user_id: int):
 
         BATCH_SIZE = 500
         
+        # Check cancel BEFORE deleting old records (prevents data loss)
+        if user_state.get("should_cancel"):
+            logger.info(f"Upload cancelled by user {user_id} after extraction.")
+            user_state["status"] = "error"
+            user_state["message"] = "Upload cancelado pelo usuário."
+            user_state["error"] = "Cancelado"
+            return
+
         # Limpar todos os registros antigos do usuário antes de inserir os novos (Auto-Replace)
         user_state["message"] = "Limpando registros antigos..."
         db.query(Process).filter(Process.user_id == user_id).delete()
