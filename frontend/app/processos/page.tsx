@@ -607,7 +607,8 @@ export default function ProcessosPage() {
                                 </div>
                             </div>
 
-                            <div className="rounded-md border overflow-hidden">
+                            {/* Desktop: Tabela */}
+                            <div className="hidden md:block rounded-md border overflow-hidden">
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 uppercase text-xs">
                                         <tr>
@@ -658,6 +659,40 @@ export default function ProcessosPage() {
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+
+                            {/* Mobile: Cards */}
+                            <div className="md:hidden space-y-3">
+                                {processes?.data.length === 0 ? (
+                                    <p className="text-center text-muted-foreground py-8">Nenhum registro encontrado.</p>
+                                ) : processes?.data.map((proc, i) => (
+                                    <div key={i} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-2 shadow-sm">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm">{proc.id}</span>
+                                            <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                                                ${["ENCERRAMENTO", "DEFERIDO"].some(s => proc.status.includes(s)) ? "bg-green-100 text-green-700" :
+                                                    ["INDEFERIDO", "CANCELADO"].some(s => proc.status.includes(s)) ? "bg-red-100 text-red-700" :
+                                                        ["ANDAMENTO", "EM DILIGENCIA"].some(s => proc.status === s) ? "bg-blue-100 text-blue-700" :
+                                                            ["RETORNO", "PENDENCIA", "SUSPENSO"].some(s => proc.status === s) ? "bg-orange-100 text-orange-700" :
+                                                                "bg-gray-100 text-gray-700"}`}>
+                                                {proc.status}
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-slate-700 dark:text-slate-300">{proc.contribuinte}</p>
+                                        <p className="text-xs text-slate-500 truncate" title={proc.tipo_solicitacao}>{proc.tipo_solicitacao}</p>
+                                        <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
+                                            <span className="text-xs text-slate-400">{proc.data_abertura}</span>
+                                            {proc.is_atrasado ? (
+                                                <span className="text-red-600 font-bold flex items-center gap-1 text-xs">
+                                                    <AlertCircle className="w-3 h-3" />
+                                                    {proc.dias_atraso_calc} dias atraso
+                                                </span>
+                                            ) : (
+                                                <span className="text-green-600 text-xs font-medium">Em dia</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
 
                             {processes && (

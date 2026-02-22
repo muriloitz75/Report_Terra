@@ -232,7 +232,7 @@ function DashboardContent() {
                                 <CardTitle className="text-red-600">Tipos com Mais Atrasos</CardTitle>
                                 <CardDescription>Top 10 Categorias de Processos Atrasados por Hierarquia</CardDescription>
                             </CardHeader>
-                            <CardContent className="h-[350px]">
+                            <CardContent className="h-[300px] md:h-[350px]">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <Treemap
                                         data={stats.by_type_delayed.map((item: { type: string; count: number }, index: number) => ({
@@ -282,7 +282,7 @@ function DashboardContent() {
                                 <CardTitle className="text-emerald-700">Ranking: Mais Encerrados</CardTitle>
                                 <CardDescription>Top 10 tipos com mais encerramentos</CardDescription>
                             </CardHeader>
-                            <CardContent className="h-[350px]">
+                            <CardContent className="h-[300px] md:h-[350px]">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie

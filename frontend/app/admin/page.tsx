@@ -248,43 +248,193 @@ export default function AdminPage() {
                             <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
-                                        <th className="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Usuário</th>
-                                        <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Papel</th>
-                                        <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Processos</th>
-                                        <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Dashboard</th>
-                                        <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Relatórios IA</th>
-                                        <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Gerar IA</th>
-                                        <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Status</th>
-                                        <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {Array.isArray(users) && users.map(user => (
-                                        <tr key={user.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                                            <td className="px-4 py-3">
-                                                <div>
-                                                    <p className="font-medium text-slate-800 dark:text-slate-100">{user.username || user.email}</p>
-                                                    {user.full_name && <p className="text-xs text-slate-500">{user.full_name}</p>}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <button
-                                                    onClick={() => handleToggleRole(user)}
-                                                    disabled={updatingId === user.id || (user.username || user.email) === (session?.user?.email)}
-                                                    className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${user.role === 'admin'
-                                                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200'
-                                                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200'
-                                                        }`}
-                                                    title={(user.username || user.email) === (session?.user?.email) ? "Não é possível alterar seu próprio papel" : "Clique para alternar papel"}
-                                                >
-                                                    {updatingId === user.id ? <Loader2 className="w-3 h-3 animate-spin" /> : user.role === 'admin' ? 'Admin' : 'Usuário'}
-                                                </button>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
+                        <>
+                            {/* Desktop: Tabela clássica */}
+                            <div className="hidden md:block overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                                            <th className="text-left px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Usuário</th>
+                                            <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Papel</th>
+                                            <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Processos</th>
+                                            <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Dashboard</th>
+                                            <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Relatórios IA</th>
+                                            <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Gerar IA</th>
+                                            <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Status</th>
+                                            <th className="text-center px-4 py-3 font-medium text-slate-500 dark:text-slate-400">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {Array.isArray(users) && users.map(user => (
+                                            <tr key={user.id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                <td className="px-4 py-3">
+                                                    <div>
+                                                        <p className="font-medium text-slate-800 dark:text-slate-100">{user.username || user.email}</p>
+                                                        {user.full_name && <p className="text-xs text-slate-500">{user.full_name}</p>}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <button
+                                                        onClick={() => handleToggleRole(user)}
+                                                        disabled={updatingId === user.id || (user.username || user.email) === (session?.user?.email)}
+                                                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${user.role === 'admin'
+                                                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200'
+                                                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200'
+                                                            }`}
+                                                        title={(user.username || user.email) === (session?.user?.email) ? "Não é possível alterar seu próprio papel" : "Clique para alternar papel"}
+                                                    >
+                                                        {updatingId === user.id ? <Loader2 className="w-3 h-3 animate-spin" /> : user.role === 'admin' ? 'Admin' : 'Usuário'}
+                                                    </button>
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={(user.can_view_processes !== false) || user.role === 'admin'}
+                                                        onChange={() => handleToggleView(user, 'can_view_processes')}
+                                                        disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
+                                                        className="h-4 w-4 accent-blue-600 disabled:opacity-50"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={(user.can_view_dashboard !== false) || user.role === 'admin'}
+                                                        onChange={() => handleToggleView(user, 'can_view_dashboard')}
+                                                        disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
+                                                        className="h-4 w-4 accent-blue-600 disabled:opacity-50"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={(user.can_view_reports !== false) || user.role === 'admin'}
+                                                        onChange={() => handleToggleView(user, 'can_view_reports')}
+                                                        disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
+                                                        className="h-4 w-4 accent-blue-600 disabled:opacity-50"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <button
+                                                        onClick={() => handleTogglePermission(user)}
+                                                        disabled={updatingId === user.id || user.role === 'admin' || user.can_view_reports === false}
+                                                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${user.can_generate_report || user.role === 'admin'
+                                                            ? 'bg-green-500'
+                                                            : 'bg-slate-300 dark:bg-slate-600'
+                                                            }`}
+                                                        title={user.role === 'admin' ? 'Admins sempre têm acesso' : user.can_view_reports === false ? 'Habilite visualização primeiro' : 'Clique para alternar'}
+                                                    >
+                                                        <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transform transition duration-200 ease-in-out ${user.can_generate_report || user.role === 'admin' ? 'translate-x-4' : 'translate-x-0'
+                                                            }`} />
+                                                    </button>
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {((user.approval_status || 'approved') === 'pending') ? (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                                            Pendente
+                                                        </span>
+                                                    ) : ((user.approval_status || 'approved') === 'rejected') ? (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                                            Reprovado
+                                                        </span>
+                                                    ) : (
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${user.is_active
+                                                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                            : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500'
+                                                            }`}>
+                                                            {user.is_active ? 'Ativo' : 'Inativo'}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {user.email !== session?.user?.email && (
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            {user.is_active ? (
+                                                                <button
+                                                                    onClick={() => handleDeactivate(user)}
+                                                                    disabled={updatingId === user.id}
+                                                                    className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                                                                    title="Desativar usuário"
+                                                                >
+                                                                    {updatingId === user.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserX className="w-4 h-4" />}
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    onClick={() => handleActivate(user)}
+                                                                    disabled={updatingId === user.id}
+                                                                    className="text-slate-400 hover:text-green-500 transition-colors disabled:opacity-50"
+                                                                    title="Reativar usuário"
+                                                                >
+                                                                    {updatingId === user.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+                                                                </button>
+                                                            )}
+                                                            {user.role !== 'admin' && (
+                                                                <button
+                                                                    onClick={() => handleDeleteUser(user)}
+                                                                    disabled={updatingId === user.id}
+                                                                    className="text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                                                                    title="Excluir permanentemente"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Mobile: Cards de Usuários */}
+                            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                                {Array.isArray(users) && users.map(user => (
+                                    <div key={`mob-${user.id}`} className="p-4 space-y-4 bg-white dark:bg-slate-900">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <p className="font-semibold text-slate-800 dark:text-slate-100">{user.username || user.email}</p>
+                                                {user.full_name && <p className="text-xs text-slate-500">{user.full_name}</p>}
+                                            </div>
+                                            {((user.approval_status || 'approved') === 'pending') ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                                    Pendente
+                                                </span>
+                                            ) : ((user.approval_status || 'approved') === 'rejected') ? (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                                    Reprovado
+                                                </span>
+                                            ) : (
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${user.is_active
+                                                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                    : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500'
+                                                    }`}>
+                                                    {user.is_active ? 'Ativo' : 'Inativo'}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Toggle de Papel */}
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Papel do Usuário</span>
+                                            <button
+                                                onClick={() => handleToggleRole(user)}
+                                                disabled={updatingId === user.id || (user.username || user.email) === (session?.user?.email)}
+                                                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${user.role === 'admin'
+                                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200'
+                                                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200'
+                                                    }`}
+                                            >
+                                                {updatingId === user.id ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+                                                {user.role === 'admin' ? 'Administrador' : 'Usuário Padrão'}
+                                            </button>
+                                        </div>
+
+                                        {/* Permissões */}
+                                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 space-y-3">
+                                            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Permissões de Acesso</p>
+
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-slate-700 dark:text-slate-300">Processos</span>
                                                 <input
                                                     type="checkbox"
                                                     checked={(user.can_view_processes !== false) || user.role === 'admin'}
@@ -292,8 +442,9 @@ export default function AdminPage() {
                                                     disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
                                                     className="h-4 w-4 accent-blue-600 disabled:opacity-50"
                                                 />
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-slate-700 dark:text-slate-300">Dashboard</span>
                                                 <input
                                                     type="checkbox"
                                                     checked={(user.can_view_dashboard !== false) || user.role === 'admin'}
@@ -301,8 +452,9 @@ export default function AdminPage() {
                                                     disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
                                                     className="h-4 w-4 accent-blue-600 disabled:opacity-50"
                                                 />
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm text-slate-700 dark:text-slate-300">Relatórios IA</span>
                                                 <input
                                                     type="checkbox"
                                                     checked={(user.can_view_reports !== false) || user.role === 'admin'}
@@ -310,8 +462,9 @@ export default function AdminPage() {
                                                     disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
                                                     className="h-4 w-4 accent-blue-600 disabled:opacity-50"
                                                 />
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
+                                            </div>
+                                            <div className="flex items-center justify-between pt-2 mt-2 border-t border-slate-200 dark:border-slate-700/50">
+                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Gerar IA</span>
                                                 <button
                                                     onClick={() => handleTogglePermission(user)}
                                                     disabled={updatingId === user.id || user.role === 'admin' || user.can_view_reports === false}
@@ -319,70 +472,53 @@ export default function AdminPage() {
                                                         ? 'bg-green-500'
                                                         : 'bg-slate-300 dark:bg-slate-600'
                                                         }`}
-                                                    title={user.role === 'admin' ? 'Admins sempre têm acesso' : user.can_view_reports === false ? 'Habilite visualização primeiro' : 'Clique para alternar'}
                                                 >
                                                     <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transform transition duration-200 ease-in-out ${user.can_generate_report || user.role === 'admin' ? 'translate-x-4' : 'translate-x-0'
                                                         }`} />
                                                 </button>
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                {((user.approval_status || 'approved') === 'pending') ? (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                                                        Pendente
-                                                    </span>
-                                                ) : ((user.approval_status || 'approved') === 'rejected') ? (
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                                                        Reprovado
-                                                    </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Ações */}
+                                        {user.email !== session?.user?.email && (
+                                            <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                                                {user.is_active ? (
+                                                    <Button
+                                                        variant="ghost" size="sm"
+                                                        onClick={() => handleDeactivate(user)}
+                                                        disabled={updatingId === user.id}
+                                                        className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8 text-xs px-2"
+                                                    >
+                                                        {updatingId === user.id ? <Loader2 className="w-3 h-3 animate-spin mr-1.5" /> : <UserX className="w-3 h-3 mr-1.5" />}
+                                                        Desativar
+                                                    </Button>
                                                 ) : (
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${user.is_active
-                                                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500'
-                                                        }`}>
-                                                        {user.is_active ? 'Ativo' : 'Inativo'}
-                                                    </span>
+                                                    <Button
+                                                        variant="ghost" size="sm"
+                                                        onClick={() => handleActivate(user)}
+                                                        disabled={updatingId === user.id}
+                                                        className="text-green-600 hover:text-green-700 hover:bg-green-50 h-8 text-xs px-2"
+                                                    >
+                                                        {updatingId === user.id ? <Loader2 className="w-3 h-3 animate-spin mr-1.5" /> : <UserCheck className="w-3 h-3 mr-1.5" />}
+                                                        Reativar
+                                                    </Button>
                                                 )}
-                                            </td>
-                                            <td className="px-4 py-3 text-center">
-                                                {user.email !== session?.user?.email && (
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        {user.is_active ? (
-                                                            <button
-                                                                onClick={() => handleDeactivate(user)}
-                                                                disabled={updatingId === user.id}
-                                                                className="text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50"
-                                                                title="Desativar usuário"
-                                                            >
-                                                                {updatingId === user.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserX className="w-4 h-4" />}
-                                                            </button>
-                                                        ) : (
-                                                            <button
-                                                                onClick={() => handleActivate(user)}
-                                                                disabled={updatingId === user.id}
-                                                                className="text-slate-400 hover:text-green-500 transition-colors disabled:opacity-50"
-                                                                title="Reativar usuário"
-                                                            >
-                                                                {updatingId === user.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
-                                                            </button>
-                                                        )}
-                                                        {user.role !== 'admin' && (
-                                                            <button
-                                                                onClick={() => handleDeleteUser(user)}
-                                                                disabled={updatingId === user.id}
-                                                                className="text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50"
-                                                                title="Excluir permanentemente"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        )}
-                                                    </div>
+                                                {user.role !== 'admin' && (
+                                                    <Button
+                                                        variant="ghost" size="sm"
+                                                        onClick={() => handleDeleteUser(user)}
+                                                        disabled={updatingId === user.id}
+                                                        className="text-slate-400 hover:text-red-600 hover:bg-red-50 h-8 px-2"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </Button>
                                                 )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </>
                     )}
                 </CardContent>
             </Card>
