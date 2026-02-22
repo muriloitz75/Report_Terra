@@ -326,6 +326,10 @@ class UserCreate(BaseModel):
     password: str
     full_name: Optional[str] = None
 
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
 @app.post("/auth/register")
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
     # Validate username: only letters, numbers, dots and underscores
@@ -348,6 +352,25 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_user)
     return {"id": new_user.id, "username": new_user.username, "message": "Cadastro solicitado. Aguarde aprovação do administrador."}
+
+@app.patch("/auth/change-password")
+def change_password(data: PasswordChange, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Verify current password
+    if not auth.verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Senha atual incorreta.")
+    
+    # Validate new password strength
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="A nova senha deve ter pelo menos 6 caracteres.")
+        
+    if data.current_password == data.new_password:
+        raise HTTPException(status_code=400, detail="A nova senha não pode ser igual à senha atual.")
+
+    # Apply new password
+    current_user.hashed_password = auth.get_password_hash(data.new_password)
+    db.commit()
+    
+    return {"message": "Senha alterada com sucesso."}
 
 # In-memory DB fallback for legacy code (will be removed later)
 # DB: Dict[str, List[Dict[str, Any]]] = {}

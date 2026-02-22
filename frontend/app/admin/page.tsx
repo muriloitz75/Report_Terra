@@ -315,14 +315,14 @@ export default function AdminPage() {
                                                 <button
                                                     onClick={() => handleTogglePermission(user)}
                                                     disabled={updatingId === user.id || user.role === 'admin' || user.can_view_reports === false}
-                                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${user.can_generate_report || user.role === 'admin'
+                                                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${user.can_generate_report || user.role === 'admin'
                                                         ? 'bg-green-500'
-                                                        : 'bg-slate-200 dark:bg-slate-700'
+                                                        : 'bg-slate-300 dark:bg-slate-600'
                                                         }`}
                                                     title={user.role === 'admin' ? 'Admins sempre têm acesso' : user.can_view_reports === false ? 'Habilite visualização primeiro' : 'Clique para alternar'}
                                                 >
-                                                    <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transform transition-transform ${user.can_generate_report || user.role === 'admin' ? 'translate-x-4.5' : 'translate-x-0.5'
-                                                        }`} style={{ transform: (user.can_generate_report || user.role === 'admin') ? 'translateX(18px)' : 'translateX(2px)' }} />
+                                                    <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transform transition duration-200 ease-in-out ${user.can_generate_report || user.role === 'admin' ? 'translate-x-4' : 'translate-x-0'
+                                                        }`} />
                                                 </button>
                                             </td>
                                             <td className="px-4 py-3 text-center">

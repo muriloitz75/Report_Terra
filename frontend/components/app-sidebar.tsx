@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, TableProperties, FileText, Menu, X, LogOut, Shield, Power, Activity } from "lucide-react";
+import { LayoutDashboard, TableProperties, FileText, Menu, X, LogOut, Shield, Power, Activity, UserCog } from "lucide-react";
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Button } from "@/components/ui/button";
@@ -88,6 +88,22 @@ export function AppSidebar() {
                                 </Link>
                             );
                         })}
+
+                        {/* Profile link - for all users */}
+                        <Link
+                            href="/perfil"
+                            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium whitespace-nowrap h-10 ${pathname === "/perfil"
+                                ? "bg-blue-600 text-white shadow-sm"
+                                : "text-slate-400 hover:text-white hover:bg-slate-800"
+                                }`}
+                            onClick={() => setIsOpen(false)}
+                            title={!isHovered ? "Meu Perfil" : undefined}
+                        >
+                            <UserCog className="w-4 h-4 shrink-0" />
+                            <span className={`transition-opacity duration-300 ${!isHovered && "md:opacity-0 md:w-0 md:hidden"}`}>
+                                Meu Perfil
+                            </span>
+                        </Link>
 
                         {/* Admin link - only for admins */}
                         {isAdmin && (

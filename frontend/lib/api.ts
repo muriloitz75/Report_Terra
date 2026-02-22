@@ -109,6 +109,14 @@ export const cancelUpload = async (): Promise<void> => {
     await api.post('/upload/cancel');
 };
 
+export const changePassword = async (currentPassword: string, newPassword: string): Promise<{ message: string }> => {
+    const response = await api.patch('/auth/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword
+    });
+    return response.data;
+};
+
 export const getStats = async (startDate = '', endDate = ''): Promise<KPIStats> => {
     const params = { start_date: startDate, end_date: endDate };
     const response = await api.get('/stats', { params });
