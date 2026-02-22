@@ -5,7 +5,7 @@ import { getStats, KPIStats, getUploadStatus } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, AlertCircle, CheckCircle, Clock, LayoutDashboard, RefreshCw } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Treemap } from 'recharts';
 import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { DatePickerWithRange } from "@/components/date-range-picker";
@@ -230,17 +230,47 @@ function DashboardContent() {
                         <Card className="md:col-span-2 shadow-sm">
                             <CardHeader>
                                 <CardTitle className="text-red-600">Tipos com Mais Atrasos</CardTitle>
-                                <CardDescription>Top 10 Categorias de Processos Atrasados</CardDescription>
+                                <CardDescription>Top 10 Categorias de Processos Atrasados por Hierarquia</CardDescription>
                             </CardHeader>
                             <CardContent className="h-[350px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={stats.by_type_delayed} layout="vertical" margin={{ left: 40 }}>
-                                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} horizontal={true} vertical={false} />
-                                        <XAxis type="number" fontSize={12} />
-                                        <YAxis dataKey="type" type="category" width={150} fontSize={11} tickFormatter={(val) => val.length > 25 ? val.substring(0, 25) + '...' : val} />
-                                        <Tooltip cursor={{ fill: 'transparent' }} />
-                                        <Bar dataKey="count" name="Atrasados" fill="#dc2626" radius={[0, 4, 4, 0]} barSize={20} />
-                                    </BarChart>
+                                    <Treemap
+                                        data={stats.by_type_delayed.map((item: { type: string; count: number }, index: number) => ({
+                                            name: item.type,
+                                            size: item.count,
+                                            fill: `hsl(${0 + index * 8}, ${75 - index * 2}%, ${45 + index * 2}%)`
+                                        }))}
+                                        dataKey="size"
+                                        aspectRatio={4 / 3}
+                                        content={({ x, y, width, height, name, size, fill }: any) => (
+                                            <g>
+                                                <rect x={x} y={y} width={width} height={height} fill={fill} stroke="#fff" strokeWidth={2} rx={4} />
+                                                {width > 60 && height > 30 && (
+                                                    <>
+                                                        <text x={x + width / 2} y={y + height / 2 - 6} textAnchor="middle" fill="#fff" fontSize={11} fontWeight={600} className="drop-shadow">
+                                                            {name.length > 20 ? name.substring(0, 20) + '…' : name}
+                                                        </text>
+                                                        <text x={x + width / 2} y={y + height / 2 + 10} textAnchor="middle" fill="rgba(255,255,255,0.85)" fontSize={12} fontWeight={700}>
+                                                            {size}
+                                                        </text>
+                                                    </>
+                                                )}
+                                            </g>
+                                        )}
+                                    >
+                                        <Tooltip
+                                            content={({ payload }: any) => {
+                                                if (!payload?.length) return null;
+                                                const { name, size } = payload[0].payload;
+                                                return (
+                                                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg px-3 py-2 text-sm">
+                                                        <p className="font-medium text-slate-800 dark:text-slate-100">{name}</p>
+                                                        <p className="text-red-600 font-bold">{size} atrasados</p>
+                                                    </div>
+                                                );
+                                            }}
+                                        />
+                                    </Treemap>
                                 </ResponsiveContainer>
                             </CardContent>
                         </Card>
@@ -254,13 +284,24 @@ function DashboardContent() {
                             </CardHeader>
                             <CardContent className="h-[350px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={stats.by_type_closed_top} layout="vertical" margin={{ left: 40 }}>
-                                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} horizontal={true} vertical={false} />
-                                        <XAxis type="number" fontSize={12} />
-                                        <YAxis dataKey="type" type="category" width={180} fontSize={11} tickFormatter={(val) => val.length > 30 ? val.substring(0, 30) + '...' : val} />
-                                        <Tooltip cursor={{ fill: 'transparent' }} />
-                                        <Bar dataKey="count" name="Encerrados" fill="#16a34a" radius={[0, 4, 4, 0]} barSize={20} />
-                                    </BarChart>
+                                    <PieChart>
+                                        <Pie
+                                            data={stats.by_type_closed_top}
+                                            cx="40%"
+                                            cy="50%"
+                                            innerRadius={70}
+                                            outerRadius={120}
+                                            dataKey="count"
+                                            nameKey="type"
+                                            paddingAngle={2}
+                                        >
+                                            {stats.by_type_closed_top.map((entry, index) => (
+                                                <Cell key={`cell-top-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip formatter={(value, name) => [value, name]} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                        <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: '11px', maxWidth: '45%', overflowY: 'auto', maxHeight: '280px' }} />
+                                    </PieChart>
                                 </ResponsiveContainer>
                             </CardContent>
                         </Card>
@@ -274,13 +315,24 @@ function DashboardContent() {
                             </CardHeader>
                             <CardContent className="h-[350px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={stats.by_type_closed_bottom} layout="vertical" margin={{ left: 40 }}>
-                                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} horizontal={true} vertical={false} />
-                                        <XAxis type="number" fontSize={12} />
-                                        <YAxis dataKey="type" type="category" width={180} fontSize={11} tickFormatter={(val) => val.length > 30 ? val.substring(0, 30) + '...' : val} />
-                                        <Tooltip cursor={{ fill: 'transparent' }} />
-                                        <Bar dataKey="count" name="Encerrados" fill="#64748b" radius={[0, 4, 4, 0]} barSize={20} />
-                                    </BarChart>
+                                    <PieChart>
+                                        <Pie
+                                            data={stats.by_type_closed_bottom}
+                                            cx="40%"
+                                            cy="50%"
+                                            innerRadius={70}
+                                            outerRadius={120}
+                                            dataKey="count"
+                                            nameKey="type"
+                                            paddingAngle={2}
+                                        >
+                                            {stats.by_type_closed_bottom.map((entry, index) => (
+                                                <Cell key={`cell-bot-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip formatter={(value, name) => [value, name]} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                        <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: '11px', maxWidth: '45%', overflowY: 'auto', maxHeight: '280px' }} />
+                                    </PieChart>
                                 </ResponsiveContainer>
                             </CardContent>
                         </Card>
