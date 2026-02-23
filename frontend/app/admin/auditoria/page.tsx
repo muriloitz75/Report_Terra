@@ -166,7 +166,7 @@ export default function AuditoriaPage() {
                         </div>
                     ) : (
                         <ResponsiveContainer width="100%" height={280}>
-                            <LineChart data={activity}>
+                            <LineChart data={activity} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                                 <XAxis
                                     dataKey="date"
@@ -247,11 +247,10 @@ export default function AuditoriaPage() {
                                                 {u.total_processes}
                                             </td>
                                             <td className="p-3 text-center">
-                                                <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${
-                                                    u.is_active
+                                                <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium ${u.is_active
                                                         ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
                                                         : "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300"
-                                                }`}>
+                                                    }`}>
                                                     {u.is_active ? "Ativo" : "Inativo"}
                                                 </span>
                                             </td>
@@ -283,11 +282,10 @@ export default function AuditoriaPage() {
                                                         <div className="space-y-1 max-h-48 overflow-y-auto">
                                                             {userHistory.map((h, i) => (
                                                                 <div key={i} className="flex items-center gap-4 text-xs py-1">
-                                                                    <span className={`px-2 py-0.5 rounded font-medium ${
-                                                                        h.action === "login"
+                                                                    <span className={`px-2 py-0.5 rounded font-medium ${h.action === "login"
                                                                             ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
                                                                             : "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300"
-                                                                    }`}>
+                                                                        }`}>
                                                                         {h.action === "login" ? "Login" : "Falha"}
                                                                     </span>
                                                                     <span className="text-slate-500 font-mono">{h.ip_address || "—"}</span>

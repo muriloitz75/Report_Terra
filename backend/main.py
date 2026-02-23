@@ -343,6 +343,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
     hashed_password = auth.get_password_hash(user.password)
     new_user = User(
         username=user.username,
+        email=f"{user.username}@placeholder.local",
         hashed_password=hashed_password,
         full_name=user.full_name,
         is_active=False,

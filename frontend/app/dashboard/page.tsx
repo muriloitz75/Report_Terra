@@ -180,7 +180,7 @@ function DashboardContent() {
                         </CardHeader>
                         <CardContent className="h-[350px]">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={stats.by_month}>
+                                <LineChart data={stats.by_month} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                                     <XAxis dataKey="month_year" fontSize={12} tickMargin={10} />
                                     <YAxis fontSize={12} />
@@ -203,14 +203,14 @@ function DashboardContent() {
                         </CardHeader>
                         <CardContent className="h-[350px]">
                             <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
+                                <PieChart margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
                                     <Pie
                                         data={stats.by_type}
                                         cx="50%"
                                         cy="50%"
                                         labelLine={false}
                                         label={({ name, percent }) => `${((percent || 0) * 100).toFixed(0)}%`}
-                                        outerRadius={120}
+                                        outerRadius="80%"
                                         fill="#8884d8"
                                         dataKey="count"
                                         nameKey="type"
@@ -284,13 +284,13 @@ function DashboardContent() {
                             </CardHeader>
                             <CardContent className="h-[300px] md:h-[350px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
+                                    <PieChart margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
                                         <Pie
                                             data={stats.by_type_closed_top}
                                             cx="40%"
                                             cy="50%"
-                                            innerRadius={70}
-                                            outerRadius={120}
+                                            innerRadius="50%"
+                                            outerRadius="80%"
                                             dataKey="count"
                                             nameKey="type"
                                             paddingAngle={2}
@@ -315,13 +315,13 @@ function DashboardContent() {
                             </CardHeader>
                             <CardContent className="h-[350px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
+                                    <PieChart margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
                                         <Pie
                                             data={stats.by_type_closed_bottom}
                                             cx="40%"
                                             cy="50%"
-                                            innerRadius={70}
-                                            outerRadius={120}
+                                            innerRadius="50%"
+                                            outerRadius="80%"
                                             dataKey="count"
                                             nameKey="type"
                                             paddingAngle={2}
