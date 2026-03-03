@@ -60,7 +60,7 @@ export function StatisticsModal({
                     if (periodoInicio) params.append('periodo_inicio', periodoInicio);
                     if (periodoFim) params.append('periodo_fim', periodoFim);
 
-                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+                    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
                     const res = await fetch(`${apiUrl}/api/statistics/evolution?${params.toString()}`, {
                         headers: {
                             'Authorization': `Bearer ${accessToken}`,

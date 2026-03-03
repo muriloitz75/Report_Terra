@@ -1337,6 +1337,8 @@ def get_statistics_evolution(
         else:
             return {"data": []}
 
+        # Normalize search string as well to handle multi-spaces/tabs etc
+        tipo_solicitacao = " ".join(tipo_solicitacao.split())
         df = df[df['tipo_solicitacao'] == tipo_solicitacao]
 
         if periodo_inicio:
