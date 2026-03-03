@@ -1027,6 +1027,38 @@ def export_excel(
         else:
             worksheet.write(row_idx, 5, '-', cell_center_fmt)
 
+    # --- Resumo / Contabilização no Final ---
+    summary_row = 4 + len(df) + 2
+    
+    total_count = len(df)
+    andamento_count = len(df[df['status'] == 'ANDAMENTO']) if 'status' in df.columns else 0
+    encerrados_count = len(df[df['status'].str.contains('ENCERRAMENTO|DEFERIDO|INDEFERIDO', na=False, case=False)]) if 'status' in df.columns else 0
+    atrasados_count = len(df[df['is_atrasado'] == True]) if 'is_atrasado' in df.columns else 0
+
+    summary_title_fmt = workbook.add_format({
+        'bold': True, 'font_size': 12, 'font_color': '#1E3A5F', 'bottom': 1, 'border_color': '#B0BEC5'
+    })
+    summary_label_fmt = workbook.add_format({
+        'bold': True, 'font_size': 10, 'align': 'right'
+    })
+    summary_value_fmt = workbook.add_format({
+        'font_size': 10, 'align': 'left', 'bold': True
+    })
+
+    worksheet.merge_range(summary_row, 0, summary_row, 1, "Resumo (Contabilização)", summary_title_fmt)
+    
+    worksheet.write(summary_row + 1, 0, "Total Geral:", summary_label_fmt)
+    worksheet.write(summary_row + 1, 1, total_count, summary_value_fmt)
+    
+    worksheet.write(summary_row + 2, 0, "Em Andamento:", summary_label_fmt)
+    worksheet.write(summary_row + 2, 1, andamento_count, summary_value_fmt)
+
+    worksheet.write(summary_row + 3, 0, "Encerrados / Resolvidos:", summary_label_fmt)
+    worksheet.write(summary_row + 3, 1, encerrados_count, summary_value_fmt)
+
+    worksheet.write(summary_row + 4, 0, "Com Atraso:", summary_label_fmt)
+    worksheet.write(summary_row + 4, 1, atrasados_count, summary_value_fmt)
+
     # Freeze header row
     worksheet.freeze_panes(4, 0)
     worksheet.set_row(3, 22)
@@ -1275,6 +1307,69 @@ def admin_audit_user_history(user_id: int, limit: int = 50, admin: User = Depend
         }
         for a in activities
     ]
+
+@app.get("/api/statistics/evolution")
+def get_statistics_evolution(
+    tipo_solicitacao: str,
+    periodo_inicio: Optional[str] = None,
+    periodo_fim: Optional[str] = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retorna a evolução temporal para o gráfico do frontend.
+    """
+    require_view_permission(user, "can_view_dashboard", "Permissão negada.")
+    try:
+        from models import Process
+        query = db.query(Process).filter(Process.user_id == user.id)
+        df = pd.read_sql(query.statement, db.bind)
+
+        if df.empty:
+            return {"data": []}
+            
+        if 'tipo_solicitacao' in df.columns:
+            df['tipo_solicitacao'] = df['tipo_solicitacao'].astype(str).str.strip().str.replace(r'\s+', ' ', regex=True)
+
+        if 'data_abertura' in df.columns and not df['data_abertura'].eq("").all():
+            df['dt'] = pd.to_datetime(df['data_abertura'], format='%d/%m/%Y', errors='coerce')
+            df['month_year'] = df['dt'].dt.strftime('%Y-%m')
+        else:
+            return {"data": []}
+
+        df = df[df['tipo_solicitacao'] == tipo_solicitacao]
+
+        if periodo_inicio:
+            df = df[df['dt'] >= pd.to_datetime(periodo_inicio)]
+        if periodo_fim:
+            df = df[df['dt'] <= pd.to_datetime(periodo_fim)]
+
+        if df.empty:
+            return {"data": []}
+
+        evolution = df.groupby('month_year').agg(
+            total=('id', 'count'),
+            encerrados=('status', lambda x: x.str.contains('ENCERRAMENTO|DEFERIDO|INDEFERIDO', na=False, case=False).sum()),
+            andamento=('status', lambda x: (x == 'ANDAMENTO').sum()),
+            atrasados=('is_atrasado', 'sum')
+        ).reset_index().sort_values('month_year')
+
+        evolution_data = []
+        for _, row in evolution.iterrows():
+            evolution_data.append({
+                "date": row['month_year'],
+                "Total": row['total'],
+                "Encerrados": row['encerrados'],
+                "Andamento": row['andamento'],
+                "Atrasados": row['atrasados']
+            })
+
+        return {"data": evolution_data}
+
+    except Exception as e:
+        logger.error(f"Error in statistics evolution: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Evolution calculation error: {str(e)}")
 
 # Mount static files (Frontend)
 # Only mount if directory exists (in production or after local build)

@@ -13,6 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { usePermissions } from '@/context/PermissionsContext';
+import { StatisticsModal } from './components/StatisticsModal';
+import { BarChart3 } from 'lucide-react';
 
 export default function ProcessosPage() {
     const { data: session, status } = useSession();
@@ -35,6 +37,7 @@ export default function ProcessosPage() {
     const [onlyDelayed, setOnlyDelayed] = useState(false);
     const [exporting, setExporting] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
@@ -589,6 +592,17 @@ export default function ProcessosPage() {
                                     <Button
                                         variant="outline"
                                         size="sm"
+                                        onClick={() => setIsStatsModalOpen(true)}
+                                        disabled={typeFilter.length !== 1 || processes?.total === 0}
+                                        className="gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-900/50"
+                                        title={typeFilter.length !== 1 ? "Selecione exatamente 1 'Tipo de Solicitação' no filtro para ver as estatísticas." : "Ver estatísticas deste tipo"}
+                                    >
+                                        <BarChart3 className="w-4 h-4" />
+                                        <span className="hidden sm:inline">Estatística</span>
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
                                         className="gap-1.5 text-muted-foreground hover:text-red-600 hover:border-red-200"
                                         onClick={() => {
                                             setSearch('');
@@ -742,6 +756,15 @@ export default function ProcessosPage() {
                             )}
                         </CardContent>
                     </Card>
+
+                    <StatisticsModal
+                        isOpen={isStatsModalOpen}
+                        onClose={() => setIsStatsModalOpen(false)}
+                        tipoSolicitacao={typeFilter.length === 1 ? typeFilter[0] : null}
+                        periodoInicio={dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : null}
+                        periodoFim={dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : null}
+                        accessToken={(session as any)?.accessToken || ""}
+                    />
                 </>
             )}
         </main>
