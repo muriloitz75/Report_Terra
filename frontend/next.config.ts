@@ -33,6 +33,10 @@ const nextConfig: NextConfig = {
         destination: `${apiUrl}/api/generate-report`,
       },
       {
+        source: '/api/statistics/:path*',
+        destination: `${apiUrl}/api/statistics/:path*`,
+      },
+      {
         source: '/api/feedback',
         destination: `${apiUrl}/api/feedback`,
       },
