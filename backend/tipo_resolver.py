@@ -27,10 +27,12 @@ _REFERENCE_PATH = os.path.join(
 
 
 def _normalize(text: str) -> str:
-    """Remove accents, collapse whitespace, uppercase."""
+    """Remove accents, collapse whitespace, uppercase, standard dashes."""
     nfkd = unicodedata.normalize("NFKD", text)
     no_accents = "".join(c for c in nfkd if not unicodedata.combining(c))
-    return " ".join(no_accents.upper().split())
+    normalized = no_accents.replace('\u2013', '-').replace('\u2014', '-')
+    return " ".join(normalized.upper().split())
+
 
 
 def _load_reference(path: str) -> list[str]:
@@ -75,17 +77,28 @@ def resolve_tipo(raw: str) -> str:
     if len(normalized_raw) < _MIN_PREFIX_LEN:
         return raw
 
+    resolved = raw
+
     # Phase 1: Exact prefix match —— fastest & most reliable
     for idx, norm_entry in enumerate(_NORMALIZED):
         if norm_entry.startswith(normalized_raw):
-            return _CANONICAL[idx]
+            resolved = _CANONICAL[idx]
+            break
+    else:
+        # Phase 2: Fuzzy fallback for irregular truncations
+        matches = get_close_matches(normalized_raw, _NORMALIZED, n=1, cutoff=_FUZZY_CUTOFF)
+        if matches:
+            idx = _NORMALIZED.index(matches[0])
+            resolved = _CANONICAL[idx]
 
-    # Phase 2: Fuzzy fallback for irregular truncations
-    matches = get_close_matches(normalized_raw, _NORMALIZED, n=1, cutoff=_FUZZY_CUTOFF)
-    if matches:
-        idx = _NORMALIZED.index(matches[0])
-        return _CANONICAL[idx]
+    # --- Business rules for type unification ---
+    if resolved == "CANCELAMENTO DE NOTAS FISCAIS DE SERVIÇOS":
+        resolved = "CANCELAMENTO DE NFS-E (EXTEMPORÂNEO)"
 
-    # Phase 3: No confident match — keep original to avoid wrong substitution
-    return raw
+    # --- Final sanitization ---
+    # Phase 3: No confident match — keep original, but always standardize dashes
+    if resolved:
+        resolved = resolved.replace('\u2013', '-').replace('\u2014', '-')
+        
+    return resolved
 

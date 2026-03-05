@@ -25,7 +25,8 @@ O **Report Terra** é uma aplicação web full-stack para extrair, analisar e vi
 - Filtros multi-select por Status e Tipo de Solicitação.
 - Filtro de período e toggle "Apenas Atrasados".
 - Paginação completa (primeira, anterior, próxima, última página).
-- Exportação para Excel respeitando todos os filtros ativos.
+- **Exportação Global:** Exportação para Excel respeitando todos os filtros ativos.
+- **Estatísticas Detalhadas:** Modal com gráfico de evolução temporal interativo para o tipo de solicitação selecionado, contendo totalizadores dinâmicos e exportação visual limpa para PNG.
 
 ### 🤖 Relatórios com IA
 - Geração de análises inteligentes via OpenAI (GPT).
@@ -41,6 +42,7 @@ O **Report Terra** é uma aplicação web full-stack para extrair, analisar e vi
 ### 📐 Regras de Negócio
 - Um processo é considerado **"Atrasado"** se o status for `ANDAMENTO` e a data de abertura for anterior a 30 dias.
 - Status reconhecidos: `ANDAMENTO`, `ENCERRAMENTO`, `DEFERIDO`, `INDEFERIDO`.
+- **Normalização de Tipos:** O backend mescla e processa ativamente nomenclaturas conflitantes ou variações visuais de hifens (ex: meia-risca, travessão) extraídos do PDF para garantir dados limpos, unificados e consistentes nos filtros.
 
 ---
 

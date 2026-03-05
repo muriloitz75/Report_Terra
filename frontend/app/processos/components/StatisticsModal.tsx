@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Loader2 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
+import { Loader2, Download } from "lucide-react";
+import { toPng } from 'html-to-image';
 
 interface StatisticsModalProps {
     isOpen: boolean;
@@ -36,6 +37,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return null;
 };
 
+
 export function StatisticsModal({
     isOpen,
     onClose,
@@ -47,6 +49,53 @@ export function StatisticsModal({
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isExporting, setIsExporting] = useState(false);
+    const modalRef = useRef<HTMLDivElement>(null);
+
+    const handleExportPNG = async () => {
+        if (!modalRef.current) return;
+
+        try {
+            setIsExporting(true);
+
+            // Wait a tick for UI state to update
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Temporarily hide the export button from the DOM for the capture
+            const buttonToHide = modalRef.current.querySelector('[data-export-exclude="true"]') as HTMLElement;
+            let originalDisplay = '';
+            if (buttonToHide) {
+                originalDisplay = buttonToHide.style.display;
+                buttonToHide.style.display = 'none';
+            }
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const dataUrl = await toPng(modalRef.current, {
+                cacheBust: true,
+                skipFonts: true, // Bypasses Turbopack CSSRules SecurityError
+                backgroundColor: isDark ? '#020617' : '#ffffff', // matches slate-950 or white
+                style: {
+                    borderRadius: '16px',
+                    overflow: 'hidden'
+                }
+            });
+
+            // Immediately restore visibility
+            if (buttonToHide) {
+                buttonToHide.style.display = originalDisplay;
+            }
+
+            const link = document.createElement('a');
+            const safeName = tipoSolicitacao ? tipoSolicitacao.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'estatisticas';
+            link.download = `grafico_evolucao_${safeName}.png`;
+            link.href = dataUrl;
+            link.click();
+        } catch (err) {
+            console.error('Erro ao exportar PNG:', err);
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     useEffect(() => {
         if (isOpen && tipoSolicitacao) {
@@ -91,70 +140,105 @@ export function StatisticsModal({
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="sm:max-w-[900px] w-[95vw] md:w-full max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200/60 dark:border-slate-800/60 shadow-2xl">
-                <div className="bg-slate-50/50 dark:bg-slate-900/50 p-6 md:px-8 border-b border-slate-100 dark:border-slate-800/60">
-                    <DialogHeader>
-                        <DialogTitle className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-blue-600 dark:text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
-                            Evolução Mensal
-                        </DialogTitle>
-                        <DialogDescription className="text-base font-medium text-slate-500 dark:text-slate-400 mt-2 line-clamp-2 leading-relaxed">
-                            {tipoSolicitacao}
-                        </DialogDescription>
-                    </DialogHeader>
-                </div>
+                <div ref={modalRef} className="flex flex-col w-full bg-white dark:bg-slate-950 rounded-2xl overflow-hidden">
+                    <div className="bg-slate-50/50 dark:bg-slate-900/50 p-6 md:px-8 border-b border-slate-100 dark:border-slate-800/60 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                        <DialogHeader className="text-left">
+                            <DialogTitle className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-blue-600 dark:text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
+                                Evolução Mensal
+                            </DialogTitle>
+                            <DialogDescription className="text-base font-medium text-slate-500 dark:text-slate-400 mt-2 line-clamp-2 leading-relaxed">
+                                {tipoSolicitacao}
+                            </DialogDescription>
+                        </DialogHeader>
 
-                <div className="p-6 md:px-8 bg-white dark:bg-slate-950">
-                    <div className="w-full h-[450px]">
-                        {loading ? (
-                            <div className="flex h-full w-full items-center justify-center flex-col gap-4 animate-in fade-in duration-500">
-                                <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
-                                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Processando estatísticas no servidor...</p>
-                            </div>
-                        ) : error ? (
-                            <div className="flex h-full w-full items-center justify-center flex-col gap-3">
-                                <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-full text-red-500">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                        {!loading && !error && data.length > 0 && (
+                            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto mt-4 sm:mt-0">
+                                <div className="flex items-center gap-3 px-4 py-2 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl w-full sm:w-auto h-full min-h-[42px]">
+                                    <div className="p-1.5 bg-blue-100 dark:bg-blue-900/50 rounded-lg text-blue-600 dark:text-blue-400">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" /></svg>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] uppercase font-bold tracking-wider text-blue-600/70 dark:text-blue-400/70 leading-none mb-0.5">Total Acumulado</span>
+                                        <span className="text-lg font-black tracking-tight text-blue-700 dark:text-blue-400 leading-none">
+                                            {data.reduce((acc, curr) => acc + (curr.Total || 0), 0)}
+                                        </span>
+                                    </div>
                                 </div>
-                                <span className="text-red-600 dark:text-red-400 font-medium text-center px-4">{error}</span>
+                                <button
+                                    data-export-exclude={true}
+                                    onClick={handleExportPNG}
+                                    disabled={isExporting}
+                                    className="inline-flex shrink-0 items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl shadow-sm hover:bg-slate-50 hover:border-slate-300 dark:hover:bg-slate-800/80 dark:hover:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:pointer-events-none w-full sm:w-auto h-full min-h-[42px]"
+                                >
+                                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin text-blue-600" /> : <Download className="w-4 h-4 text-slate-500 dark:text-slate-400" />}
+                                    <span>{isExporting ? 'Processando...' : 'Exportar Gráfico'}</span>
+                                </button>
                             </div>
-                        ) : data.length === 0 ? (
-                            <div className="flex h-full w-full items-center justify-center flex-col gap-3">
-                                <div className="p-5 bg-slate-50 dark:bg-slate-900/50 rounded-full text-slate-400 dark:text-slate-500">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" /></svg>
-                                </div>
-                                <span className="text-slate-500 dark:text-slate-400 font-medium tracking-tight">Nenhum registro para o período selecionado.</span>
-                            </div>
-                        ) : (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={data} margin={{ top: 20, right: 10, left: -20, bottom: 0 }} barGap={2}>
-                                    <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e2e8f0" className="dark:stroke-slate-800/60" />
-                                    <XAxis
-                                        dataKey="date"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#64748b', fontSize: 13, fontWeight: 500 }}
-                                        dy={15}
-                                    />
-                                    <YAxis
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#64748b', fontSize: 13, fontWeight: 500 }}
-                                        dx={-10}
-                                        allowDecimals={false}
-                                    />
-                                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(100, 116, 139, 0.05)' }} />
-                                    <Legend
-                                        wrapperStyle={{ paddingTop: '30px', paddingBottom: '10px' }}
-                                        iconType="circle"
-                                        formatter={(value) => <span className="text-slate-700 dark:text-slate-300 font-medium ml-1.5">{value}</span>}
-                                    />
-                                    <Bar dataKey="Total" name="Total (Geral)" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={45} animationDuration={1000} />
-                                    <Bar dataKey="Encerrados" name="Concluídos" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={45} animationDuration={1000} />
-                                    <Bar dataKey="Andamento" name="Em Andamento" fill="#f59e0b" radius={[6, 6, 0, 0]} maxBarSize={45} animationDuration={1000} />
-                                    <Bar dataKey="Atrasados" name="Com Atraso" fill="#ef4444" radius={[6, 6, 0, 0]} maxBarSize={45} animationDuration={1000} />
-                                </BarChart>
-                            </ResponsiveContainer>
                         )}
+                    </div>
+
+                    <div className="p-6 md:px-8 bg-white dark:bg-slate-950">
+                        <div className="w-full h-[450px]">
+                            {loading ? (
+                                <div className="flex h-full w-full items-center justify-center flex-col gap-4 animate-in fade-in duration-500">
+                                    <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+                                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Processando estatísticas no servidor...</p>
+                                </div>
+                            ) : error ? (
+                                <div className="flex h-full w-full items-center justify-center flex-col gap-3">
+                                    <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-full text-red-500">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                                    </div>
+                                    <span className="text-red-600 dark:text-red-400 font-medium text-center px-4">{error}</span>
+                                </div>
+                            ) : data.length === 0 ? (
+                                <div className="flex h-full w-full items-center justify-center flex-col gap-3">
+                                    <div className="p-5 bg-slate-50 dark:bg-slate-900/50 rounded-full text-slate-400 dark:text-slate-500">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 9h18" /><path d="M9 21V9" /></svg>
+                                    </div>
+                                    <span className="text-slate-500 dark:text-slate-400 font-medium tracking-tight">Nenhum registro para o período selecionado.</span>
+                                </div>
+                            ) : (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={data} margin={{ top: 40, right: 10, left: -20, bottom: 0 }} barGap={2}>
+                                        <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e2e8f0" className="dark:stroke-slate-800/60" />
+                                        <XAxis
+                                            dataKey="date"
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#64748b', fontSize: 13, fontWeight: 500 }}
+                                            dy={15}
+                                        />
+                                        <YAxis
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: '#64748b', fontSize: 13, fontWeight: 500 }}
+                                            dx={-10}
+                                            allowDecimals={false}
+                                        />
+                                        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(100, 116, 139, 0.05)' }} />
+                                        <Legend
+                                            wrapperStyle={{ paddingTop: '30px', paddingBottom: '10px' }}
+                                            iconType="circle"
+                                            formatter={(value) => <span className="text-slate-700 dark:text-slate-300 font-medium ml-1.5">{value}</span>}
+                                        />
+                                        <Bar dataKey="Total" name="Total (Geral)" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={45} animationDuration={1000}>
+                                            <LabelList dataKey="Total" position="top" offset={10} fill="#64748b" fontSize={12} fontWeight={700} formatter={(v: any) => v > 0 ? v : ""} />
+                                        </Bar>
+                                        <Bar dataKey="Encerrados" name="Concluídos" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={45} animationDuration={1000}>
+                                            <LabelList dataKey="Encerrados" position="top" offset={10} fill="#64748b" fontSize={12} fontWeight={700} formatter={(v: any) => v > 0 ? v : ""} />
+                                        </Bar>
+                                        <Bar dataKey="Andamento" name="Em Andamento" fill="#f59e0b" radius={[6, 6, 0, 0]} maxBarSize={45} animationDuration={1000}>
+                                            <LabelList dataKey="Andamento" position="top" offset={10} fill="#64748b" fontSize={12} fontWeight={700} formatter={(v: any) => v > 0 ? v : ""} />
+                                        </Bar>
+                                        <Bar dataKey="Atrasados" name="Com Atraso" fill="#ef4444" radius={[6, 6, 0, 0]} maxBarSize={45} animationDuration={1000}>
+                                            <LabelList dataKey="Atrasados" position="top" offset={10} fill="#64748b" fontSize={12} fontWeight={700} formatter={(v: any) => v > 0 ? v : ""} />
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            )}
+                        </div>
                     </div>
                 </div>
             </DialogContent>

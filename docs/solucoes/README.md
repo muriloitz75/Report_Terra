@@ -35,6 +35,12 @@
 |---|---|---|
 | [frontend-network-error-api-url.md](frontend/frontend-network-error-api-url.md) | `Network Error` ao buscar dados da API | ✅ Resolvido |
 
+### ⚙️ Backend / API
+
+| Arquivo | Erro | Status |
+|---|---|---|
+| [backend-resolucao-tipos-duplicados.md](backend/backend-resolucao-tipos-duplicados.md) | Tipos duplicados no Select e Gráficos (ex: Cancelamentos / Travessões corrompendo SQL) | ✅ Resolvido |
+
 ### 🐳 Deploy / Docker
 
 | Arquivo | Erro | Status |
