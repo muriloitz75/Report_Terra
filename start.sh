@@ -14,7 +14,7 @@ trap cleanup SIGTERM SIGINT
 start_backend() {
     while true; do
         echo "Iniciando backend na porta 8000..."
-        cd /app/backend && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 &
+        cd /app/backend && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1 &
         BACKEND_PID=$!
 
         # Wait for backend to be ready

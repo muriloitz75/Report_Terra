@@ -33,6 +33,8 @@ COPY --from=frontend_build /app/frontend/public ./frontend/standalone/public
 # Variáveis de Ambiente Padrão
 ENV LOG_LEVEL=INFO
 ENV NODE_ENV=production
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 ENV BACKEND_API_URL=http://127.0.0.1:8000
 ENV AUTH_TRUST_HOST=true
 # AUTH_SECRET para NextAuth - sobrescreva no Railway com valor próprio

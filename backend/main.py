@@ -8,6 +8,7 @@ import shutil
 import os
 import io
 import pandas as pd
+import gc
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 from process_pdf import parse_pdf
@@ -502,6 +503,9 @@ def process_pdf_background(tmp_path: str, user_id: int):
                 os.remove(tmp_path)
             except Exception as e:
                 logger.warning(f"Failed to remove temp file {tmp_path}: {e}")
+        
+        # Explicit garbage collection after processing
+        gc.collect()
 
 @app.get("/api/health")
 async def health_check():
@@ -718,7 +722,7 @@ def get_stats(
                 by_type_delayed.columns = ['type', 'count']
                 by_type_delayed_data = by_type_delayed.to_dict('records')
 
-        return {
+        results = {
             "total": total,
             "encerrados": encerrados_count,
             "andamento": andamento_count,
@@ -732,6 +736,12 @@ def get_stats(
             "all_types": all_types,
             "available_months": available_months
         }
+        
+        # Free up memory from Pandas DataFrame
+        del df
+        gc.collect()
+        
+        return results
     except Exception as e:
         logger.error(f"Error in get_stats: {e}")
         logger.error(traceback.format_exc())
@@ -823,12 +833,18 @@ def get_processes(
     
     paginated = df.iloc[start:end].to_dict('records')
     
-    return {
+    results = {
         "data": paginated,
         "total": total_records,
         "page": page,
         "pages": total_pages
     }
+    
+    # Free up memory
+    del df
+    gc.collect()
+    
+    return results
 
 @app.get("/export-excel")
 def export_excel(
@@ -1065,6 +1081,10 @@ def export_excel(
 
     workbook.close()
     output.seek(0)
+    
+    # Free up memory
+    del df
+    gc.collect()
 
     filename = f"Report_Terra_Processos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     return StreamingResponse(
