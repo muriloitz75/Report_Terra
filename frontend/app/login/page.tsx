@@ -93,24 +93,24 @@ export default function LoginPage() {
                 <div className="relative z-10 p-12 lg:p-16 flex-grow flex flex-col justify-center max-w-2xl mx-auto w-full">
                     <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-white/5 border border-white/10 w-fit mb-8 backdrop-blur-sm">
                         <FileBarChart className="w-5 h-5 text-blue-400" />
-                        <span className="text-sm font-medium tracking-wide text-blue-100/90 uppercase">Visão Analítica Integrada</span>
+                        <span className="text-sm font-medium tracking-wide text-blue-100/90 uppercase">Análise Inteligente de Processos</span>
                     </div>
 
                     <h1 className="text-5xl lg:text-7xl font-extrabold tracking-tight mb-8 leading-[1.1]">
-                        Ecossistema<br />
+                        Report<br />
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-200">
-                            DIAAF.
+                            Terra.
                         </span>
                     </h1>
 
                     <p className="text-xl text-slate-300 leading-relaxed max-w-lg font-medium opacity-90">
-                        Gestão de dados estaduais em tempo real. Transforme dados tabulares em decisões estratégicas através do nosso dashboard de processos centralizado.
+                        Extraia, analise e visualize dados de processos com IA. Transforme PDFs complexos em painéis gerenciais e decisões estratégicas em tempo real.
                     </p>
                 </div>
 
                 <div className="relative z-10 p-12 lg:p-16 border-t border-white/5 bg-slate-900/50 backdrop-blur-md">
                     <p className="text-sm text-slate-500 font-medium">
-                        &copy; {new Date().getFullYear()} DIAAF - Departamento de Administração e Finanças.
+                        &copy; {new Date().getFullYear()} Report Terra. Plataforma de Análise de Dados e Indicadores.
                     </p>
                 </div>
             </div>
@@ -122,7 +122,7 @@ export default function LoginPage() {
                     <div className="bg-blue-600 p-2 rounded-lg">
                         <FileBarChart className="w-6 h-6 text-white" />
                     </div>
-                    <span className="text-xl font-bold text-slate-900 dark:text-white">Ecossistema DIAAF</span>
+                    <span className="text-xl font-bold text-slate-900 dark:text-white">Report Terra</span>
                 </div>
 
                 <div className="w-full max-w-[420px] space-y-10">
@@ -131,7 +131,7 @@ export default function LoginPage() {
                             Acessar o sistema
                         </h2>
                         <p className="text-slate-500 dark:text-slate-400 text-base">
-                            Informe suas credenciais corporativas abaixo para continuar.
+                            Informe suas credenciais abaixo para continuar.
                         </p>
                     </div>
 
