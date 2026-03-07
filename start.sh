@@ -12,6 +12,10 @@ trap cleanup SIGTERM SIGINT
 
 # --- Start Backend with auto-restart ---
 start_backend() {
+    echo "Rodando migrações de banco de dados..."
+    cd /app || cd /build || true
+    python3 backend/migrate_types_universal.py || echo "Warning: Migration failed, continuing anyway."
+
     while true; do
         echo "Iniciando backend na porta 8000..."
         cd /app/backend && python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1 &
