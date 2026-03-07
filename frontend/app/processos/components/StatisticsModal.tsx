@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
-import { Loader2, Download } from "lucide-react";
-import { toPng } from 'html-to-image';
+import { Loader2 } from "lucide-react";
 
 interface StatisticsModalProps {
     isOpen: boolean;
@@ -49,53 +48,7 @@ export function StatisticsModal({
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [isExporting, setIsExporting] = useState(false);
-    const modalRef = useRef<HTMLDivElement>(null);
 
-    const handleExportPNG = async () => {
-        if (!modalRef.current) return;
-
-        try {
-            setIsExporting(true);
-
-            // Wait a tick for UI state to update
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            // Temporarily hide the export button from the DOM for the capture
-            const buttonToHide = modalRef.current.querySelector('[data-export-exclude="true"]') as HTMLElement;
-            let originalDisplay = '';
-            if (buttonToHide) {
-                originalDisplay = buttonToHide.style.display;
-                buttonToHide.style.display = 'none';
-            }
-
-            const isDark = document.documentElement.classList.contains('dark');
-            const dataUrl = await toPng(modalRef.current, {
-                cacheBust: true,
-                skipFonts: true, // Bypasses Turbopack CSSRules SecurityError
-                backgroundColor: isDark ? '#020617' : '#ffffff', // matches slate-950 or white
-                style: {
-                    borderRadius: '16px',
-                    overflow: 'hidden'
-                }
-            });
-
-            // Immediately restore visibility
-            if (buttonToHide) {
-                buttonToHide.style.display = originalDisplay;
-            }
-
-            const link = document.createElement('a');
-            const safeName = tipoSolicitacao ? tipoSolicitacao.replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'estatisticas';
-            link.download = `grafico_evolucao_${safeName}.png`;
-            link.href = dataUrl;
-            link.click();
-        } catch (err) {
-            console.error('Erro ao exportar PNG:', err);
-        } finally {
-            setIsExporting(false);
-        }
-    };
 
     useEffect(() => {
         if (isOpen && tipoSolicitacao) {
@@ -140,7 +93,7 @@ export function StatisticsModal({
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="sm:max-w-[900px] w-[95vw] md:w-full max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-2xl border-slate-200/60 dark:border-slate-800/60 shadow-2xl">
-                <div ref={modalRef} className="flex flex-col w-full bg-white dark:bg-slate-950 rounded-2xl overflow-hidden">
+                <div className="flex flex-col w-full bg-white dark:bg-slate-950 rounded-2xl overflow-hidden">
                     <div className="bg-slate-50/50 dark:bg-slate-900/50 p-6 md:px-8 border-b border-slate-100 dark:border-slate-800/60 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                         <DialogHeader className="text-left">
                             <DialogTitle className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
@@ -165,15 +118,6 @@ export function StatisticsModal({
                                         </span>
                                     </div>
                                 </div>
-                                <button
-                                    data-export-exclude={true}
-                                    onClick={handleExportPNG}
-                                    disabled={isExporting}
-                                    className="inline-flex shrink-0 items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-xl shadow-sm hover:bg-slate-50 hover:border-slate-300 dark:hover:bg-slate-800/80 dark:hover:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 disabled:pointer-events-none w-full sm:w-auto h-full min-h-[42px]"
-                                >
-                                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin text-blue-600" /> : <Download className="w-4 h-4 text-slate-500 dark:text-slate-400" />}
-                                    <span>{isExporting ? 'Processando...' : 'Exportar Gráfico'}</span>
-                                </button>
                             </div>
                         )}
                     </div>
