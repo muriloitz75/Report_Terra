@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
-import { Loader2 } from "lucide-react";
+import { Loader2, Share2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import * as htmlToImage from "html-to-image";
 
 interface StatisticsModalProps {
     isOpen: boolean;
@@ -48,7 +50,117 @@ export function StatisticsModal({
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const chartRef = useRef<HTMLDivElement>(null);
 
+    const getChartBlob = async (): Promise<Blob | null> => {
+        if (!chartRef.current) return null;
+        const isDark = document.documentElement.classList.contains("dark");
+        const backgroundColor = isDark ? "#0f172a" : "#ffffff";
+
+        // Caminho preferencial: exportar diretamente o SVG do Recharts
+        try {
+            const svg = chartRef.current.querySelector("svg") as SVGSVGElement | null;
+            if (svg) {
+                const bbox = svg.getBoundingClientRect();
+                const width = Math.ceil(bbox.width);
+                const height = Math.ceil(bbox.height);
+                const cloned = svg.cloneNode(true) as SVGSVGElement;
+                cloned.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+                cloned.setAttribute("width", String(width));
+                cloned.setAttribute("height", String(height));
+                if (!cloned.getAttribute("viewBox")) {
+                    cloned.setAttribute("viewBox", `0 0 ${width} ${height}`);
+                }
+                const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                rect.setAttribute("width", "100%");
+                rect.setAttribute("height", "100%");
+                rect.setAttribute("fill", backgroundColor);
+                cloned.insertBefore(rect, cloned.firstChild);
+
+                const serialized = new XMLSerializer().serializeToString(cloned);
+                const svgBlob = new Blob([serialized], { type: "image/svg+xml;charset=utf-8" });
+                const url = URL.createObjectURL(svgBlob);
+                try {
+                    const img = new Image();
+                    img.decoding = "sync";
+                    img.crossOrigin = "anonymous";
+                    await new Promise<void>((resolve, reject) => {
+                        img.onload = () => resolve();
+                        img.onerror = (e) => reject(e);
+                        img.src = url;
+                    });
+                    const ratio = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+                    const canvas = document.createElement("canvas");
+                    canvas.width = Math.ceil(width * ratio);
+                    canvas.height = Math.ceil(height * ratio);
+                    const ctx = canvas.getContext("2d");
+                    if (!ctx) throw new Error("canvas-context");
+                    ctx.scale(ratio, ratio);
+                    ctx.fillStyle = backgroundColor;
+                    ctx.fillRect(0, 0, width, height);
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, "image/png"));
+                    return blob;
+                } finally {
+                    URL.revokeObjectURL(url);
+                }
+            }
+        } catch {
+            /* se falhar, tenta fallback abaixo */
+        }
+
+        // Fallback: html-to-image no container (evita fontes para reduzir SecurityError)
+        try {
+            const dataUrl = await htmlToImage.toPng(chartRef.current, {
+                cacheBust: true,
+                backgroundColor,
+                // @ts-ignore – opção suportada em html-to-image >=1.11
+                skipFonts: true
+            } as any);
+            const res = await fetch(dataUrl);
+            return await res.blob();
+        } catch {
+            return null;
+        }
+    };
+
+    const downloadPng = async () => {
+        const blob = await getChartBlob();
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "grafico-evolucao-mensal.png";
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const shareNative = async (text: string) => {
+        try {
+            const blob = await getChartBlob();
+            if (!blob) throw new Error("no-blob");
+            const file = new File([blob], "grafico-evolucao-mensal.png", { type: "image/png" });
+            const n: any = navigator;
+            if (n.canShare && n.canShare({ files: [file] })) {
+                await n.share({
+                    files: [file],
+                    title: "Evolução Mensal",
+                    text
+                });
+                return;
+            }
+        } catch {
+            /* fallthrough */
+        }
+        await downloadPng();
+    };
+
+    const composeMessage = () => {
+        const titulo = "Evolução Mensal";
+        const tipo = tipoSolicitacao ? ` • ${tipoSolicitacao}` : "";
+        const total = data.reduce((acc, curr) => acc + (curr.Total || 0), 0);
+        return `${titulo}${tipo} — Total: ${total}`;
+    };
 
     useEffect(() => {
         if (isOpen && tipoSolicitacao) {
@@ -99,6 +211,15 @@ export function StatisticsModal({
                             <DialogTitle className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-blue-600 dark:text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
                                 Evolução Mensal
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="ml-1"
+                                    title="Compartilhar gráfico"
+                                    onClick={() => shareNative(composeMessage())}
+                                >
+                                    <Share2 className="w-4 h-4" />
+                                </Button>
                             </DialogTitle>
                             <DialogDescription className="text-base font-medium text-slate-500 dark:text-slate-400 mt-2 line-clamp-2 leading-relaxed">
                                 {tipoSolicitacao}
@@ -123,7 +244,7 @@ export function StatisticsModal({
                     </div>
 
                     <div className="p-6 md:px-8 bg-white dark:bg-slate-950">
-                        <div className="w-full h-[450px]">
+                        <div ref={chartRef} className="w-full h-[450px]">
                             {loading ? (
                                 <div className="flex h-full w-full items-center justify-center flex-col gap-4 animate-in fade-in duration-500">
                                     <Loader2 className="h-10 w-10 animate-spin text-blue-600" />

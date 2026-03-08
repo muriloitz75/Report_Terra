@@ -52,12 +52,18 @@ def summarize_data(df: pd.DataFrame) -> str:
     # Delays
     delayed_count = 0
     avg_delay = 0
+    median_delay = 0
+    std_delay = 0
+    p90_delay = 0
     max_delay = 0
     if 'is_atrasado' in df.columns and 'dias_atraso_calc' in df.columns:
         delayed_df = df[df['is_atrasado'] == True]
         delayed_count = len(delayed_df)
         if not delayed_df.empty:
-            avg_delay = int(delayed_df['dias_atraso_calc'].mean())
+            avg_delay = round(float(delayed_df['dias_atraso_calc'].mean()), 2)
+            median_delay = round(float(delayed_df['dias_atraso_calc'].median()), 2)
+            std_delay = round(float(delayed_df['dias_atraso_calc'].std()), 2) if len(delayed_df) > 1 else 0.0
+            p90_delay = round(float(delayed_df['dias_atraso_calc'].quantile(0.9)), 2)
             max_delay = int(delayed_df['dias_atraso_calc'].max())
 
     # Recent items (Last 3)
@@ -80,18 +86,26 @@ def summarize_data(df: pd.DataFrame) -> str:
     Principais Tipos de Solicitação (Top 5):
     {type_summary}
     
-    Métricas de Atraso:
-    - Processos Atrasados: {delayed_count}
-    - Média de Dias de Atraso: {avg_delay}
-    - Maior Atraso Registrado: {max_delay} dias
+    Métricas de Atraso (Estatística de Dispersão):
+    - Volume de Processos Atrasados: {delayed_count}
+    - Média (Atraso Típico): {avg_delay} dias
+    - Mediana (Ponto Central - Imune a Outliers): {median_delay} dias
+    - Desvio Padrão (Volatilidade/Imprevisibilidade): {std_delay} dias
+    - Percentil 90 (Os 10% piores casos superam): {p90_delay} dias
+    - Atraso Máximo Absoluto (Pior Cenário): {max_delay} dias
     
     Exemplos Recentes (Amostra):
     {recent_summary}
     """
     return summary
 
-def get_llm_model():
-    provider = os.getenv("LLM_PROVIDER", "openai").lower()
+import logging
+logger = logging.getLogger("ai_agent")
+
+def get_llm_model(provider: str = None):
+    provider = provider or os.getenv("LLM_PROVIDER", "openai")
+    provider = provider.lower()
+    logger.info(f"DEBUG LLM: Atribuindo provedor de inteligência artificial '{provider}'")
     
     if provider == "anthropic":
         if not ChatAnthropic:
@@ -124,12 +138,14 @@ def get_llm_model():
             huggingfacehub_api_token=api_key
         )
 
-    elif provider == "lmstudio":
+    elif provider in ["lmstudio", "lm_studio"]:
         # LM Studio mimics OpenAI API
         base_url = os.getenv("LM_STUDIO_URL", "http://localhost:1234/v1")
+        logger.info(f"DEBUG LLM: Initialize Local LM Studio no URL {base_url}")
+        # Explicitly pass a dummy key to prevent langchain from checking os.environ["OPENAI_API_KEY"]
         return ChatOpenAI(
             base_url=base_url,
-            api_key="lm-studio", # Key is ignored by LM Studio usually
+            api_key="lm-studio-dummy-key",
             model="local-model", # Model is determined by what is loaded in LM Studio
             temperature=0.7,
             streaming=True
@@ -167,7 +183,7 @@ def get_few_shot_examples() -> str:
         print(f"Error loading few-shot examples: {e}")
         return ""
 
-async def generate_analysis_stream(df: pd.DataFrame, user_prompt: str = "") -> Generator[str, None, None]:
+async def generate_analysis_stream(df: pd.DataFrame, user_prompt: str = "", provider: str = None) -> Generator[str, None, None]:
     """
     Generates an AI analysis of the data using the configured LLM provider.
     """
@@ -176,21 +192,24 @@ async def generate_analysis_stream(df: pd.DataFrame, user_prompt: str = "") -> G
     few_shot_context = get_few_shot_examples()
     
     try:
-        llm = get_llm_model()
+        llm = get_llm_model(provider)
         
-        system_prompt = f"""Você é um analista de dados especialista em processos governamentais (prefeitura/urbanismo).
-        Sua tarefa é analisar o resumo dos dados de processos fornecido e gerar um relatório executivo em Markdown.
-        
-        Diretrizes:
-        1. Comece com uma "Visão Geral" rápida.
-        2. Destaque pontos de atenção (ex: muitos processos atrasados, gargalos em um tipo específico).
-        3. Se houver atrasos, sugira ações corretivas genéricas.
-        4. Seja conciso e profissional. Use tópicos (bullet points) para facilitar a leitura.
-        5. Responda DIRETAMENTE à pergunta do usuário se houver uma.
+        system_prompt = f"""Você é um **Lead Data Scientist / Senior Statistician** atuando no setor público/governamental.
+        Sua tarefa é dissecar o resumo estatístico dos processos fornecido e gerar um relatório executivo de altíssimo nível em Markdown.
+
+        Diretrizes Restritas:
+        1. **Tom e Persona:** Frio, direto, professoral e altamente maduro. Absolutamente NENHUM clichê como "é importante notar que", "em resumo", ou floreios gramaticais. Use jargão técnico apropriado (Dispersão, Variância, Outliers, Gargalos Sistêmicos, Custo de Oportunidade).
+        2. **Diagnóstico Estrutural:** Não repita os números como um robô. Interprete a relação entre a 'Mediana' e a 'Média' para determinar se o atraso é um problema sistêmico crônico ou pontual (outliers pesados na cauda do Percentil 90).
+        3. **Estrutura Obrigatória:** 
+           - **Diagnóstico Executivo** (Visão geral bruta e direta)
+           - **Análise de Dispersão e Atrasos** (Interpretação da variância e previsibilidade do fluxo)
+           - **Análise de Causa-Raiz Sugerida** (Hipóteses baseadas nos tipos de solicitação com gargalo)
+           - **Recomendações Táticas** (Ações corretivas focadas em eficiência operacional)
+        4. Responda DIRETAMENTE à objeção ou instrução específica do usuário, se aplicável, no final do documento.
         
         {few_shot_context}
         
-        O formato da resposta deve ser Markdown válido.
+        O formato da resposta deve ser rigorosamente Markdown válido, utilizando negritos em métricas chave.
         """
         
         prompt = ChatPromptTemplate.from_messages([

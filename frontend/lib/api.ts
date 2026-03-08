@@ -179,7 +179,8 @@ export const generateReport = async (
     startDate = '',
     endDate = '',
     onlyDelayed = false,
-    userPrompt = ''
+    userPrompt = '',
+    llmProvider = 'auto'
 ) => {
     const params = new URLSearchParams();
     if (search) params.append('search', search);
@@ -189,6 +190,7 @@ export const generateReport = async (
     if (userPrompt) params.append('user_prompt', userPrompt);
     if (typeFilter.length > 0) params.append('type_filter', typeFilter.join(','));
     if (statusFilter.length > 0) params.append('status_filter', statusFilter.join(','));
+    if (llmProvider && llmProvider !== 'auto') params.append('llm_provider', llmProvider);
 
     // Note: We use fetch here because axios doesn't support streaming response body as easily in browser
     const currentAuthHeader = getAuthHeader();

@@ -25,6 +25,7 @@ function RelatoriosContent() {
     const canGenerate = canGenerateReport;
     const [prompt, setPrompt] = useState("");
     const [feedbackGiven, setFeedbackGiven] = useState<"positive" | "negative" | null>(null);
+    const [llmProvider, setLlmProvider] = useState<string>("auto");
 
     useEffect(() => {
         if (status === "loading") return;
@@ -74,7 +75,8 @@ function RelatoriosContent() {
             filters.fromParam,
             filters.toParam,
             filters.onlyDelayed,
-            prompt
+            prompt,
+            llmProvider
         );
     };
 
@@ -104,7 +106,8 @@ function RelatoriosContent() {
             filters.fromParam,
             filters.toParam,
             filters.onlyDelayed,
-            improvementPrompt
+            improvementPrompt,
+            llmProvider
         );
     };
 
@@ -324,6 +327,26 @@ Todas as informações são baseadas nos dados disponíveis no momento da geraç
                     )}
 
                     <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-xl ring-1 ring-slate-200 dark:ring-slate-800 focus-within:ring-2 focus-within:ring-purple-500/50 transition-shadow">
+                        <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800/50 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50 rounded-t-xl overflow-hidden">
+                            <span className="text-[10px] sm:text-xs font-semibold tracking-wider text-slate-500 uppercase flex items-center gap-1.5"><Wand2 className="w-3.5 h-3.5" /> Motor de IA</span>
+                            <div className="relative inline-flex">
+                                <select
+                                    value={llmProvider}
+                                    onChange={(e) => setLlmProvider(e.target.value)}
+                                    className="appearance-none bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 border-0 text-slate-700 dark:text-slate-300 font-medium text-xs sm:text-sm rounded-md pl-2 pr-6 py-1 focus:outline-none focus:ring-0 cursor-pointer transition-colors"
+                                >
+                                    <option value="auto">Automático (Servidor)</option>
+                                    <option value="openai">OpenAI (ChatGPT)</option>
+                                    <option value="google">Google (Gemini)</option>
+                                    <option value="anthropic">Anthropic (Claude)</option>
+                                    <option value="huggingface">HuggingFace (Código Aberto)</option>
+                                    <option value="lm_studio">LM Studio (Local Host)</option>
+                                </select>
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-slate-400">
+                                    <svg className="fill-current h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                                </div>
+                            </div>
+                        </div>
                         <Textarea
                             placeholder="Descreva o que deseja analisar ou refinar..."
                             value={prompt}

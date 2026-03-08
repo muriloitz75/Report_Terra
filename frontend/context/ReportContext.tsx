@@ -13,7 +13,8 @@ interface ReportContextType {
         fromParam?: string,
         toParam?: string,
         onlyDelayed?: boolean,
-        prompt?: string
+        prompt?: string,
+        llmProvider?: string
     ) => Promise<void>;
     clearReport: () => void;
     setReport: (report: string) => void;
@@ -56,7 +57,8 @@ export function ReportProvider({ children }: { children: ReactNode }) {
         fromParam = '',
         toParam = '',
         onlyDelayed = false,
-        prompt = ''
+        prompt = '',
+        llmProvider = 'auto'
     ) => {
         setLoading(true);
         setReport("");
@@ -71,7 +73,8 @@ export function ReportProvider({ children }: { children: ReactNode }) {
                 fromParam,
                 toParam,
                 onlyDelayed,
-                prompt
+                prompt,
+                llmProvider
             );
         } catch (error) {
             console.error(error);

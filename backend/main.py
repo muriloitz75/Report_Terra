@@ -1433,15 +1433,18 @@ async def serve_react_app(full_path: str):
 
 from ai_agent import generate_analysis_stream
 
+from fastapi import Query
+
 @app.post("/api/generate-report")
 async def generate_report(
-    search: Optional[str] = None, 
-    type_filter: Optional[str] = None,
-    status_filter: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    only_delayed: bool = False,
-    user_prompt: Optional[str] = None,
+    search: Optional[str] = Query(None), 
+    type_filter: Optional[str] = Query(None),
+    status_filter: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    only_delayed: bool = Query(False),
+    user_prompt: Optional[str] = Query(None),
+    llm_provider: Optional[str] = Query(None),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -1450,6 +1453,13 @@ async def generate_report(
     Streams the response in Markdown format.
     """
     require_view_permission(user, "can_view_reports", "Permissão negada.")
+    
+    # Direct file dump for reliable Windows debugging
+    with open("debug_params.txt", "a", encoding="utf-8") as f:
+        f.write(f"{datetime.now()} - provider: {llm_provider}, search: {search}\n")
+    
+    logger.info(f"DEBUG API: Request recebido - provider: {llm_provider}, only_delayed: {only_delayed}")
+    
     user_role = getattr(user, 'role', 'user')
     user_can = getattr(user, 'can_generate_report', False)
     if user_role != "admin" and not user_can:
@@ -1507,7 +1517,7 @@ async def generate_report(
     # --- End Filtering ---
 
     return StreamingResponse(
-        generate_analysis_stream(df, user_prompt or ""),
+        generate_analysis_stream(df, user_prompt or "", provider=llm_provider),
         media_type="text/markdown"
     )
 
