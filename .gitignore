@@ -1,3 +1,9 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
 # Dependencies
 .venv/backend/report_terra.db
 backend/data/
