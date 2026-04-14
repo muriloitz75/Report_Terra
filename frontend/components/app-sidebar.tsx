@@ -38,8 +38,8 @@ export function AppSidebar() {
     return (
         <>
             {/* Mobile Menu Button */}
-            <div className="md:hidden fixed top-4 left-4 z-50">
-                <Button variant="outline" size="icon" onClick={() => setIsOpen(!isOpen)}>
+            <div className="md:hidden fixed top-3 left-3 z-50">
+                <Button variant="outline" size="icon" className="h-9 w-9 shadow-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm" onClick={() => setIsOpen(!isOpen)}>
                     {isOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
                 </Button>
             </div>

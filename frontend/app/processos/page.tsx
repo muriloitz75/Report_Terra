@@ -4,12 +4,18 @@ import { useState, useEffect, useRef } from 'react';
 import { uploadPDF, getStats, getProcesses, exportExcel, clearRecords, PaginatedProcesses, getUploadStatus, KPIStats, cancelUpload } from '@/lib/api';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Upload, RefreshCw, AlertCircle, Check, ListFilter, Loader2, Search, Download, FilterX, TableProperties, Trash2, ChevronsLeft, ChevronsRight, X } from 'lucide-react';
+import { Upload, RefreshCw, AlertCircle, Check, ListFilter, Loader2, Search, Download, FilterX, TableProperties, Trash2, ChevronsLeft, ChevronsRight, X, MoreVertical } from 'lucide-react';
 import { DateRange } from "react-day-picker";
 import { format } from "date-fns";
 import { DatePickerWithRange } from "@/components/date-range-picker";
 import { ModeToggle as ThemeToggle } from "@/components/mode-toggle";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { usePermissions } from '@/context/PermissionsContext';
@@ -242,21 +248,25 @@ export default function ProcessosPage() {
 
 
     return (
-        <main className="p-8 space-y-8 font-sans">
-            <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <main className="p-4 md:p-8 space-y-4 md:space-y-8 font-sans">
+            <header className="flex flex-col md:flex-row justify-between items-center mb-4 md:mb-8 gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                        <TableProperties className="w-8 h-8 text-blue-600" />
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                        <TableProperties className="w-6 h-6 md:w-8 md:h-8 text-blue-600" />
                         Processos
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">Gerencie e analise todos os registros detalhados</p>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm md:text-base">Gerencie e analise todos os registros detalhados</p>
                 </div>
 
-                <div className="flex gap-4 items-center">
-                    <div className="flex items-center gap-2 mr-2 border-r pr-4 border-slate-200 dark:border-slate-700">
+                <div className="flex gap-2 md:gap-4 items-center w-full md:w-auto">
+                    <div className="hidden md:flex items-center gap-2 mr-2 border-r pr-4 border-slate-200 dark:border-slate-700">
                         <ThemeToggle />
                     </div>
-                    <div className="relative">
+                    {/* Hidden theme toggle for mobile menu access */}
+                    <div className="hidden">
+                        <ThemeToggle />
+                    </div>
+                    <div className="relative flex-1 md:flex-none">
                         <Input
                             type="file"
                             accept=".pdf"
@@ -266,10 +276,10 @@ export default function ProcessosPage() {
                             disabled={uploading}
                         />
                         {uploading ? (
-                            <div className="flex items-center gap-2">
-                                <div className="flex flex-col gap-1.5 min-w-[200px] cursor-default bg-slate-50 dark:bg-slate-900 border px-3 py-1.5 rounded-md">
+                            <div className="flex items-center gap-2 w-full">
+                                <div className="flex flex-col gap-1.5 flex-1 min-w-[120px] md:min-w-[200px] cursor-default bg-slate-50 dark:bg-slate-900 border px-3 py-1.5 rounded-md">
                                     <div className="flex items-center justify-between text-xs">
-                                        <span className="text-slate-600 dark:text-slate-400 truncate max-w-[160px]">
+                                        <span className="text-slate-600 dark:text-slate-400 truncate max-w-[100px] md:max-w-[160px]">
                                             {uploadProgress >= 100 ? "Concluído!" : uploadMessage || "Processando..."}
                                         </span>
                                         <span className="font-bold text-blue-600 dark:text-blue-400 tabular-nums ml-2">
@@ -286,7 +296,7 @@ export default function ProcessosPage() {
                                 <Button
                                     variant="outline"
                                     size="icon"
-                                    className="h-10 w-10 text-red-500 border-red-200 hover:bg-red-50 hover:border-red-300 dark:border-red-900 dark:hover:bg-red-900/50"
+                                    className="h-8 w-8 md:h-10 md:w-10 text-red-500 border-red-200 hover:bg-red-50 hover:border-red-300 dark:border-red-900 dark:hover:bg-red-900/50 shrink-0"
                                     onClick={handleCancelUpload}
                                     title="Cancelar Envio"
                                 >
@@ -294,58 +304,104 @@ export default function ProcessosPage() {
                                 </Button>
                             </div>
                         ) : (
-                            <label htmlFor="pdf-upload">
-                                <Button variant="default" className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white" asChild>
+                            <label htmlFor="pdf-upload" className="w-full md:w-auto">
+                                <Button variant="default" className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white w-full md:w-auto text-sm" asChild>
                                     <span>
-                                        <Upload className="w-4 h-4 mr-2" />
-                                        Importar PDF
+                                        <Upload className="w-4 h-4 md:mr-2" />
+                                        <span className="hidden sm:inline">Importar PDF</span>
                                     </span>
                                 </Button>
                             </label>
                         )}
                     </div>
 
-                    <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
-                        <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                        Atualizar
-                    </Button>
-
-                    {stats && stats.total > 0 && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 gap-1.5"
-                            disabled={loading}
-                            onClick={async () => {
-                                if (!confirm('Tem certeza que deseja limpar todos os registros? Esta ação não pode ser desfeita.')) return;
-                                try {
-                                    await clearRecords();
-                                    setStats(null);
-                                    setProcesses(null);
-                                    setPage(1);
-                                } catch (error) {
-                                    alert('Erro ao limpar registros');
-                                }
-                            }}
-                        >
-                            <Trash2 className="w-4 h-4" />
-                            Limpar Tudo
+                    {/* Desktop Actions */}
+                    <div className="hidden md:flex gap-4 items-center">
+                        <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
+                            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                            Atualizar
                         </Button>
-                    )}
+
+                        {stats && stats.total > 0 && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300 gap-1.5"
+                                disabled={loading}
+                                onClick={async () => {
+                                    if (!confirm('Tem certeza que deseja limpar todos os registros? Esta ação não pode ser desfeita.')) return;
+                                    try {
+                                        await clearRecords();
+                                        setStats(null);
+                                        setProcesses(null);
+                                        setPage(1);
+                                    } catch (error) {
+                                        alert('Erro ao limpar registros');
+                                    }
+                                }}
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Limpar Tudo
+                            </Button>
+                        )}
+                    </div>
+
+                    {/* Mobile Actions Menu */}
+                    <div className="md:hidden ml-auto">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="icon" className="h-9 w-9">
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem onClick={() => {
+                                    const el = document.getElementById('theme-toggle-mobile');
+                                    if (el) el.click();
+                                }}>
+                                    <span className="text-sm">Alternar Tema</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={loadData} disabled={loading}>
+                                    <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                                    <span className="text-sm">{loading ? 'Atualizando...' : 'Atualizar'}</span>
+                                </DropdownMenuItem>
+                                {stats && stats.total > 0 && (
+                                    <DropdownMenuItem
+                                        className="text-red-600 focus:text-red-600"
+                                        onClick={async () => {
+                                            if (!confirm('Tem certeza que deseja limpar todos os registros? Esta ação não pode ser desfeita.')) return;
+                                            try {
+                                                await clearRecords();
+                                                setStats(null);
+                                                setProcesses(null);
+                                                setPage(1);
+                                            } catch (error) {
+                                                alert('Erro ao limpar registros');
+                                            }
+                                        }}
+                                        disabled={loading}
+                                    >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        <span className="text-sm">Limpar Tudo</span>
+                                    </DropdownMenuItem>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                 </div>
             </header>
 
             {(isCheckingUpload || uploading) && (
-                <div className="flex flex-col items-center justify-center p-20 mt-10 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-900/50 animate-in fade-in zoom-in duration-500">
+                <div className="flex flex-col items-center justify-center p-8 md:p-20 mt-6 md:mt-10 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl bg-slate-50/50 dark:bg-slate-900/50 animate-in fade-in zoom-in duration-500">
                     <img
                         src="/gifs/sonic.gif"
                         alt="Carregando..."
-                        className="w-32 h-auto mb-6 object-contain"
+                        className="w-24 md:w-32 h-auto mb-4 md:mb-6 object-contain"
                     />
-                    <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-300">
+                    <h3 className="text-lg md:text-xl font-semibold text-slate-700 dark:text-slate-300 text-center">
                         {isCheckingUpload ? "Avaliando base de dados..." : "Atualização em Progresso"}
                     </h3>
-                    <p className="text-slate-500 mt-2 text-center max-w-md">
+                    <p className="text-slate-500 mt-2 text-center max-w-md text-sm md:text-base px-4">
                         {uploading
                             ? "O PDF está sendo processado a toda velocidade nos bastidores da aplicação..."
                             : "Estamos conferindo se há alguma atividade nos bastidores, só um instante..."}

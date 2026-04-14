@@ -77,8 +77,8 @@ function DashboardContent() {
     }, [dateRange, isCheckingUpload, uploading]);
 
     return (
-        <div className="p-8 space-y-8 font-sans">
-            <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <div className="p-4 md:p-8 space-y-4 md:space-y-8 font-sans">
+            <header className="flex flex-col md:flex-row justify-between items-center mb-4 md:mb-8 gap-4">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
                         <LayoutDashboard className="w-8 h-8 text-blue-600" />

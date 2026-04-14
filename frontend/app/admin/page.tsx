@@ -168,22 +168,22 @@ export default function AdminPage() {
     }
 
     return (
-        <div className="p-6 max-w-5xl mx-auto space-y-6">
+        <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4 md:space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="bg-amber-100 dark:bg-amber-900/20 p-2 rounded-lg">
-                        <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+                    <div className="bg-amber-100 dark:bg-amber-900/20 p-1.5 md:p-2 rounded-lg shrink-0">
+                        <Shield className="w-4 h-4 md:w-5 md:h-5 text-amber-600 dark:text-amber-400" />
                     </div>
-                    <div>
-                        <h1 className="text-xl font-semibold text-slate-800 dark:text-slate-100">Painel de Administração</h1>
-                        <p className="text-sm text-slate-500">Gerencie usuários e permissões</p>
+                    <div className="min-w-0">
+                        <h1 className="text-base md:text-xl font-semibold text-slate-800 dark:text-slate-100 truncate">Painel de Administração</h1>
+                        <p className="text-xs text-slate-500 hidden sm:block">Gerencie usuários e permissões</p>
                     </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0">
                     <Button variant="outline" size="sm" onClick={fetchUsers} disabled={loading}>
-                        <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                        Atualizar
+                        <RefreshCw className={`w-4 h-4 md:mr-2 ${loading ? 'animate-spin' : ''}`} />
+                        <span className="hidden sm:inline">Atualizar</span>
                     </Button>
                 </div>
             </div>
@@ -389,22 +389,22 @@ export default function AdminPage() {
                             {/* Mobile: Cards de Usuários */}
                             <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
                                 {Array.isArray(users) && users.map(user => (
-                                    <div key={`mob-${user.id}`} className="p-4 space-y-4 bg-white dark:bg-slate-900">
-                                        <div className="flex items-start justify-between">
-                                            <div>
-                                                <p className="font-semibold text-slate-800 dark:text-slate-100">{user.username || user.email}</p>
-                                                {user.full_name && <p className="text-xs text-slate-500">{user.full_name}</p>}
+                                    <div key={`mob-${user.id}`} className="p-3 space-y-3 bg-white dark:bg-slate-900">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{user.username || user.email}</p>
+                                                {user.full_name && <p className="text-xs text-slate-500 truncate">{user.full_name}</p>}
                                             </div>
                                             {((user.approval_status || 'approved') === 'pending') ? (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 shrink-0">
                                                     Pendente
                                                 </span>
                                             ) : ((user.approval_status || 'approved') === 'rejected') ? (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 shrink-0">
                                                     Reprovado
                                                 </span>
                                             ) : (
-                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${user.is_active
+                                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${user.is_active
                                                     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                                                     : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500'
                                                     }`}>
@@ -415,56 +415,59 @@ export default function AdminPage() {
 
                                         {/* Toggle de Papel */}
                                         <div className="flex items-center justify-between">
-                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Papel do Usuário</span>
+                                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Papel</span>
                                             <button
                                                 onClick={() => handleToggleRole(user)}
                                                 disabled={updatingId === user.id || (user.username || user.email) === (session?.user?.email)}
-                                                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${user.role === 'admin'
-                                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 hover:bg-amber-200'
-                                                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200'
+                                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${user.role === 'admin'
+                                                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                                                     }`}
                                             >
                                                 {updatingId === user.id ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
-                                                {user.role === 'admin' ? 'Administrador' : 'Usuário Padrão'}
+                                                {user.role === 'admin' ? 'Admin' : 'Usuário'}
                                             </button>
                                         </div>
 
-                                        {/* Permissões */}
-                                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 space-y-3">
-                                            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Permissões de Acesso</p>
+                                        {/* Permissões - Compact Grid */}
+                                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2.5 space-y-2">
+                                            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Permissões</p>
 
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm text-slate-700 dark:text-slate-300">Processos</span>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={(user.can_view_processes !== false) || user.role === 'admin'}
-                                                    onChange={() => handleToggleView(user, 'can_view_processes')}
-                                                    disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
-                                                    className="h-4 w-4 accent-blue-600 disabled:opacity-50"
-                                                />
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-slate-700 dark:text-slate-300">Processos</span>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={(user.can_view_processes !== false) || user.role === 'admin'}
+                                                        onChange={() => handleToggleView(user, 'can_view_processes')}
+                                                        disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
+                                                        className="h-4 w-4 accent-blue-600 disabled:opacity-50"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-slate-700 dark:text-slate-300">Dashboard</span>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={(user.can_view_dashboard !== false) || user.role === 'admin'}
+                                                        onChange={() => handleToggleView(user, 'can_view_dashboard')}
+                                                        disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
+                                                        className="h-4 w-4 accent-blue-600 disabled:opacity-50"
+                                                    />
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-slate-700 dark:text-slate-300">Relatórios</span>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={(user.can_view_reports !== false) || user.role === 'admin'}
+                                                        onChange={() => handleToggleView(user, 'can_view_reports')}
+                                                        disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
+                                                        className="h-4 w-4 accent-blue-600 disabled:opacity-50"
+                                                    />
+                                                </div>
                                             </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm text-slate-700 dark:text-slate-300">Dashboard</span>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={(user.can_view_dashboard !== false) || user.role === 'admin'}
-                                                    onChange={() => handleToggleView(user, 'can_view_dashboard')}
-                                                    disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
-                                                    className="h-4 w-4 accent-blue-600 disabled:opacity-50"
-                                                />
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-sm text-slate-700 dark:text-slate-300">Relatórios IA</span>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={(user.can_view_reports !== false) || user.role === 'admin'}
-                                                    onChange={() => handleToggleView(user, 'can_view_reports')}
-                                                    disabled={updatingId === user.id || user.role === 'admin' || user.email === (session?.user?.email)}
-                                                    className="h-4 w-4 accent-blue-600 disabled:opacity-50"
-                                                />
-                                            </div>
+                                            
                                             <div className="flex items-center justify-between pt-2 mt-2 border-t border-slate-200 dark:border-slate-700/50">
-                                                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Gerar IA</span>
+                                                <span className="text-xs font-medium text-slate-700 dark:text-slate-200">Gerar IA</span>
                                                 <button
                                                     onClick={() => handleTogglePermission(user)}
                                                     disabled={updatingId === user.id || user.role === 'admin' || user.can_view_reports === false}

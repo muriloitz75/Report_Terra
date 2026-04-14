@@ -309,31 +309,32 @@ Todas as informações são baseadas nos dados disponíveis no momento da geraç
             </main>
 
             {/* Input Area - Fixed Bottom */}
-            <div className="flex-none p-4 pb-6 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent dark:from-slate-950 dark:via-slate-950 pt-10">
+            <div className="flex-none p-3 md:p-4 pb-4 md:pb-6 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent dark:from-slate-950 dark:via-slate-950 pt-8 md:pt-10">
                 <div className="max-w-5xl mx-auto relative">
                     {report && (
-                        <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex gap-2">
+                        <div className="absolute -top-10 md:-top-12 left-1/2 -translate-x-1/2 flex gap-2">
                             <Button
                                 variant="secondary"
                                 size="sm"
                                 onClick={handleImprove}
                                 disabled={loading}
-                                className="shadow-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur border hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full px-4 h-9"
+                                className="shadow-lg bg-white/90 dark:bg-slate-800/90 backdrop-blur border hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full px-3 md:px-4 h-8 md:h-9 text-xs md:text-sm"
                             >
-                                <Wand2 className="w-3.5 h-3.5 mr-2" />
-                                Melhorar Escrita
+                                <Wand2 className="w-3 h-3 md:w-3.5 md:h-3.5 mr-2" />
+                                <span className="hidden sm:inline">Melhorar Escrita</span>
+                                <span className="sm:hidden">Melhorar</span>
                             </Button>
                         </div>
                     )}
 
                     <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-xl ring-1 ring-slate-200 dark:ring-slate-800 focus-within:ring-2 focus-within:ring-purple-500/50 transition-shadow">
-                        <div className="px-4 py-2 border-b border-slate-100 dark:border-slate-800/50 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50 rounded-t-xl overflow-hidden">
-                            <span className="text-[10px] sm:text-xs font-semibold tracking-wider text-slate-500 uppercase flex items-center gap-1.5"><Wand2 className="w-3.5 h-3.5" /> Motor de IA</span>
+                        <div className="px-3 md:px-4 py-2 border-b border-slate-100 dark:border-slate-800/50 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50 rounded-t-xl overflow-hidden">
+                            <span className="text-[9px] md:text-[10px] sm:text-xs font-semibold tracking-wider text-slate-500 uppercase flex items-center gap-1.5"><Wand2 className="w-3 h-3 md:w-3.5 md:h-3.5" /> Motor de IA</span>
                             <div className="relative inline-flex">
                                 <select
                                     value={llmProvider}
                                     onChange={(e) => setLlmProvider(e.target.value)}
-                                    className="appearance-none bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 border-0 text-slate-700 dark:text-slate-300 font-medium text-xs sm:text-sm rounded-md pl-2 pr-6 py-1 focus:outline-none focus:ring-0 cursor-pointer transition-colors"
+                                    className="appearance-none bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 border-0 text-slate-700 dark:text-slate-300 font-medium text-[9px] md:text-xs sm:text-sm rounded-md pl-1.5 md:pl-2 pr-5 md:pr-6 py-1 focus:outline-none focus:ring-0 cursor-pointer transition-colors"
                                 >
                                     <option value="auto">Automático (Servidor)</option>
                                     <option value="openai">OpenAI (ChatGPT)</option>
@@ -343,7 +344,7 @@ Todas as informações são baseadas nos dados disponíveis no momento da geraç
                                     <option value="lm_studio">LM Studio (Local Host)</option>
                                 </select>
                                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 text-slate-400">
-                                    <svg className="fill-current h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                                    <svg className="fill-current h-3 w-3 md:h-3.5 md:w-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
                                 </div>
                             </div>
                         </div>
@@ -357,21 +358,21 @@ Todas as informações são baseadas nos dados disponíveis no momento da geraç
                                     handleGenerate();
                                 }
                             }}
-                            className="w-full min-h-[60px] max-h-[200px] bg-transparent border-0 focus-visible:ring-0 resize-none py-4 pl-4 pr-14 text-sm md:text-base scrollbar-hide"
+                            className="w-full min-h-[50px] md:min-h-[60px] max-h-[150px] md:max-h-[200px] bg-transparent border-0 focus-visible:ring-0 resize-none py-3 md:py-4 pl-3 md:pl-4 pr-12 md:pr-14 text-xs md:text-sm"
                         />
                         <Button
                             onClick={handleGenerate}
                             disabled={loading || !prompt.trim() || !canGenerate}
                             size="icon"
-                            className="absolute right-2 bottom-2 h-9 w-9 bg-purple-600 hover:bg-purple-700 text-white rounded-lg disabled:opacity-50 transition-all"
+                            className="absolute right-1.5 md:right-2 bottom-1.5 md:bottom-2 h-8 w-8 md:h-9 md:w-9 bg-purple-600 hover:bg-purple-700 text-white rounded-lg disabled:opacity-50 transition-all"
                             title={!canGenerate ? "Sem permissão para gerar relatórios" : undefined}
                         >
                             {loading ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" />
                             ) : !canGenerate ? (
-                                <Lock className="w-4 h-4" />
+                                <Lock className="w-3.5 h-3.5 md:w-4 md:h-4" />
                             ) : (
-                                <Sparkles className="w-4 h-4 fill-white" />
+                                <Sparkles className="w-3.5 h-3.5 md:w-4 md:h-4 fill-white" />
                             )}
                         </Button>
                     </div>
