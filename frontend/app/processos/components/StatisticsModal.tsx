@@ -18,17 +18,20 @@ interface StatisticsModalProps {
 
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
+        // Detectar se é mobile
+        const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+        
         return (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-2xl">
-                <p className="font-semibold text-slate-800 dark:text-slate-200 mb-3 pb-2 border-b border-slate-100 dark:border-slate-800 text-base">{label}</p>
-                <div className="space-y-2">
+            <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl ${isMobile ? 'p-2.5 max-w-[180px]' : 'p-4'}`}>
+                <p className={`font-semibold text-slate-800 dark:text-slate-200 ${isMobile ? 'mb-1.5 pb-1.5 text-xs' : 'mb-3 pb-2 text-base'} border-b border-slate-100 dark:border-slate-800`}>{label}</p>
+                <div className={isMobile ? 'space-y-1' : 'space-y-2'}>
                     {payload.map((entry: any, index: number) => (
-                        <div key={index} className="flex items-center justify-between gap-6 text-sm">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-3.5 h-3.5 rounded-full ring-2 ring-white dark:ring-slate-900 shadow-sm" style={{ backgroundColor: entry.color }} />
-                                <span className="text-slate-600 dark:text-slate-400 font-medium capitalize">{entry.name}</span>
+                        <div key={index} className={`flex items-center justify-between ${isMobile ? 'gap-3 text-xs' : 'gap-6 text-sm'}`}>
+                            <div className="flex items-center gap-1.5">
+                                <div className={`rounded-full ring-1 ring-white dark:ring-slate-900 ${isMobile ? 'w-2 h-2' : 'w-3.5 h-3.5'}`} style={{ backgroundColor: entry.color }} />
+                                <span className={`text-slate-600 dark:text-slate-400 ${isMobile ? 'font-medium text-[10px]' : 'font-medium capitalize'}`}>{entry.name}</span>
                             </div>
-                            <span className="font-bold text-slate-900 dark:text-slate-100">{entry.value}</span>
+                            <span className={`font-bold text-slate-900 dark:text-slate-100 ${isMobile ? 'text-xs' : ''}`}>{entry.value}</span>
                         </div>
                     ))}
                 </div>
@@ -266,7 +269,7 @@ export function StatisticsModal({
                                 </div>
                             ) : (
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={data} margin={{ top: 20, right: 5, left: -10, bottom: 0 }} barGap={2}>
+                                    <BarChart data={data} margin={{ top: 10, right: 5, left: -10, bottom: 0 }} barGap={2}>
                                         <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e2e8f0" className="dark:stroke-slate-800/60" />
                                         <XAxis
                                             dataKey="date"
@@ -289,19 +292,30 @@ export function StatisticsModal({
                                             wrapperStyle={{ paddingTop: '20px', paddingBottom: '5px', fontSize: '12px' }}
                                             iconType="circle"
                                             iconSize={10}
-                                            formatter={(value) => <span className="text-slate-700 dark:text-slate-300 font-medium ml-1 text-xs sm:text-sm">{value}</span>}
+                                            formatter={(value) => {
+                                                // Abreviar nomes no mobile
+                                                const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+                                                const shortNames: Record<string, string> = {
+                                                    'Total (Geral)': 'Total',
+                                                    'Concluídos': 'Concl.',
+                                                    'Em Andamento': 'Andam.',
+                                                    'Com Atraso': 'Atraso'
+                                                };
+                                                const displayName = isMobile ? (shortNames[value] || value) : value;
+                                                return <span className="text-slate-700 dark:text-slate-300 font-medium ml-1 text-xs sm:text-sm">{displayName}</span>;
+                                            }}
                                         />
                                         <Bar dataKey="Total" name="Total (Geral)" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} animationDuration={800}>
-                                            <LabelList dataKey="Total" position="top" offset={8} fill="#64748b" fontSize={10} fontWeight={700} formatter={(v: any) => v > 0 ? v : ""} />
+                                            <LabelList dataKey="Total" position="top" offset={8} fill="#64748b" fontSize={10} fontWeight={700} className="hidden sm:block" formatter={(v: any) => v > 0 ? v : ""} />
                                         </Bar>
                                         <Bar dataKey="Encerrados" name="Concluídos" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} animationDuration={800}>
-                                            <LabelList dataKey="Encerrados" position="top" offset={8} fill="#64748b" fontSize={10} fontWeight={700} formatter={(v: any) => v > 0 ? v : ""} />
+                                            <LabelList dataKey="Encerrados" position="top" offset={8} fill="#64748b" fontSize={10} fontWeight={700} className="hidden sm:block" formatter={(v: any) => v > 0 ? v : ""} />
                                         </Bar>
                                         <Bar dataKey="Andamento" name="Em Andamento" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={40} animationDuration={800}>
-                                            <LabelList dataKey="Andamento" position="top" offset={8} fill="#64748b" fontSize={10} fontWeight={700} formatter={(v: any) => v > 0 ? v : ""} />
+                                            <LabelList dataKey="Andamento" position="top" offset={8} fill="#64748b" fontSize={10} fontWeight={700} className="hidden sm:block" formatter={(v: any) => v > 0 ? v : ""} />
                                         </Bar>
                                         <Bar dataKey="Atrasados" name="Com Atraso" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={40} animationDuration={800}>
-                                            <LabelList dataKey="Atrasados" position="top" offset={8} fill="#64748b" fontSize={10} fontWeight={700} formatter={(v: any) => v > 0 ? v : ""} />
+                                            <LabelList dataKey="Atrasados" position="top" offset={8} fill="#64748b" fontSize={10} fontWeight={700} className="hidden sm:block" formatter={(v: any) => v > 0 ? v : ""} />
                                         </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
