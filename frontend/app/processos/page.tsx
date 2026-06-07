@@ -649,9 +649,13 @@ export default function ProcessosPage() {
                                         variant="outline"
                                         size="sm"
                                         onClick={() => setIsStatsModalOpen(true)}
-                                        disabled={typeFilter.length !== 1 || processes?.total === 0}
+                                        disabled={typeFilter.length < 1 || typeFilter.length > 5 || processes?.total === 0}
                                         className="gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-900/50"
-                                        title={typeFilter.length !== 1 ? "Selecione exatamente 1 'Tipo de Solicitação' no filtro para ver as estatísticas." : "Ver estatísticas deste tipo"}
+                                        title={typeFilter.length === 0
+                                            ? "Selecione de 1 a 5 'Tipo de Solicitação' no filtro para ver as estatísticas."
+                                            : typeFilter.length > 5
+                                                ? "Selecione no máximo 5 tipos para gerar o gráfico."
+                                                : "Ver estatísticas dos tipos selecionados"}
                                     >
                                         <BarChart3 className="w-4 h-4" />
                                         <span className="hidden sm:inline">Estatística</span>
@@ -816,7 +820,7 @@ export default function ProcessosPage() {
                     <StatisticsModal
                         isOpen={isStatsModalOpen}
                         onClose={() => setIsStatsModalOpen(false)}
-                        tipoSolicitacao={typeFilter.length === 1 ? typeFilter[0] : null}
+                        tiposSolicitacao={typeFilter}
                         periodoInicio={dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : null}
                         periodoFim={dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : null}
                         accessToken={(session as any)?.accessToken || ""}

@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
-import { Loader2, Share2 } from "lucide-react";
+import { Loader2, Share2, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import * as htmlToImage from "html-to-image";
 
 interface StatisticsModalProps {
     isOpen: boolean;
     onClose: () => void;
-    tipoSolicitacao: string | null;
+    tiposSolicitacao: string[];
     periodoInicio: string | null;
     periodoFim: string | null;
     accessToken: string;
@@ -45,7 +45,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export function StatisticsModal({
     isOpen,
     onClose,
-    tipoSolicitacao,
+    tiposSolicitacao,
     periodoInicio,
     periodoFim,
     accessToken
@@ -53,7 +53,12 @@ export function StatisticsModal({
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isMaximized, setIsMaximized] = useState(false);
     const chartRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!isOpen) setIsMaximized(false);
+    }, [isOpen]);
 
     const getChartBlob = async (): Promise<Blob | null> => {
         if (!chartRef.current) return null;
@@ -117,7 +122,6 @@ export function StatisticsModal({
             const dataUrl = await htmlToImage.toPng(chartRef.current, {
                 cacheBust: true,
                 backgroundColor,
-                // @ts-ignore – opção suportada em html-to-image >=1.11
                 skipFonts: true
             } as any);
             const res = await fetch(dataUrl);
@@ -158,22 +162,28 @@ export function StatisticsModal({
         await downloadPng();
     };
 
+    const formatTypesDescription = () => {
+        if (tiposSolicitacao.length === 0) return "";
+        if (tiposSolicitacao.length <= 2) return tiposSolicitacao.join(", ");
+        return `${tiposSolicitacao.slice(0, 2).join(", ")} e mais ${tiposSolicitacao.length - 2} tipo(s)`;
+    };
+
     const composeMessage = () => {
         const titulo = "Evolução Mensal";
-        const tipo = tipoSolicitacao ? ` • ${tipoSolicitacao}` : "";
+        const tipo = tiposSolicitacao.length > 0 ? ` • ${formatTypesDescription()}` : "";
         const total = data.reduce((acc, curr) => acc + (curr.Total || 0), 0);
         return `${titulo}${tipo} — Total: ${total}`;
     };
 
     useEffect(() => {
-        if (isOpen && tipoSolicitacao) {
+        if (isOpen && tiposSolicitacao && tiposSolicitacao.length > 0) {
             setLoading(true);
             setError(null);
 
             const fetchEvolution = async () => {
                 try {
                     const params = new URLSearchParams();
-                    params.append('tipo_solicitacao', tipoSolicitacao);
+                    params.append('tipo_solicitacao', tiposSolicitacao.join(','));
                     if (periodoInicio) params.append('periodo_inicio', periodoInicio);
                     if (periodoFim) params.append('periodo_fim', periodoFim);
 
@@ -203,12 +213,12 @@ export function StatisticsModal({
 
             fetchEvolution();
         }
-    }, [isOpen, tipoSolicitacao, periodoInicio, periodoFim, accessToken]);
+    }, [isOpen, tiposSolicitacao, periodoInicio, periodoFim, accessToken]);
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-[900px] w-[95vw] md:w-[85vw] lg:w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-xl sm:rounded-2xl border-slate-200/60 dark:border-slate-800/60 shadow-2xl">
-                <div className="flex flex-col w-full bg-white dark:bg-slate-950 rounded-xl sm:rounded-2xl overflow-hidden">
+            <DialogContent className={isMaximized ? "max-w-[100vw] w-[100vw] max-h-[100vh] h-[100vh] overflow-y-auto p-0 gap-0 !rounded-none border-slate-200/60 dark:border-slate-800/60 shadow-2xl" : "sm:max-w-[900px] w-[95vw] md:w-[85vw] lg:w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-xl sm:rounded-2xl border-slate-200/60 dark:border-slate-800/60 shadow-2xl"}>
+                <div className={`flex flex-col w-full bg-white dark:bg-slate-950 overflow-hidden ${isMaximized ? "rounded-none" : "rounded-xl sm:rounded-2xl"}`}>
                     <div className="bg-slate-50/50 dark:bg-slate-900/50 p-4 sm:p-6 md:px-8 border-b border-slate-100 dark:border-slate-800/60 flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
                         <DialogHeader className="text-left">
                             <DialogTitle className="text-lg sm:text-xl md:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-1.5 sm:gap-2 flex-wrap">
@@ -223,9 +233,21 @@ export function StatisticsModal({
                                 >
                                     <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    title={isMaximized ? "Restaurar tamanho" : "Maximizar"}
+                                    onClick={() => setIsMaximized((v) => !v)}
+                                >
+                                    {isMaximized
+                                        ? <Minimize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                        : <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    }
+                                </Button>
                             </DialogTitle>
-                            <DialogDescription className="text-sm sm:text-base font-medium text-slate-500 dark:text-slate-400 mt-1 sm:mt-2 line-clamp-2 leading-relaxed">
-                                {tipoSolicitacao}
+                            <DialogDescription className="text-sm sm:text-base font-medium text-slate-500 dark:text-slate-400 mt-1 sm:mt-2 line-clamp-2 leading-relaxed" title={tiposSolicitacao.join(", ")}>
+                                {formatTypesDescription()}
                             </DialogDescription>
                         </DialogHeader>
 
@@ -247,7 +269,7 @@ export function StatisticsModal({
                     </div>
 
                     <div className="p-4 sm:p-6 md:px-8 bg-white dark:bg-slate-950">
-                        <div ref={chartRef} className="w-full h-[300px] sm:h-[380px] md:h-[450px]">
+                        <div ref={chartRef} className={`w-full ${isMaximized ? "h-[65vh]" : "h-[300px] sm:h-[380px] md:h-[450px]"}`}>
                             {loading ? (
                                 <div className="flex h-full w-full items-center justify-center flex-col gap-3 sm:gap-4 animate-in fade-in duration-500">
                                     <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 animate-spin text-blue-600" />
@@ -269,7 +291,7 @@ export function StatisticsModal({
                                 </div>
                             ) : (
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={data} margin={{ top: 10, right: 5, left: -10, bottom: 0 }} barGap={2}>
+                                    <BarChart data={data} margin={{ top: 30, right: 20, left: -10, bottom: 0 }} barGap={2}>
                                         <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e2e8f0" className="dark:stroke-slate-800/60" />
                                         <XAxis
                                             dataKey="date"

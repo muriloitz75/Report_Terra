@@ -1357,9 +1357,9 @@ def get_statistics_evolution(
         else:
             return {"data": []}
 
-        # Normalize search string as well to handle multi-spaces/tabs etc
-        tipo_solicitacao = " ".join(tipo_solicitacao.split())
-        df = df[df['tipo_solicitacao'] == tipo_solicitacao]
+        # Normalize and split types (comma-separated list)
+        types = [" ".join(t.strip().split()) for t in tipo_solicitacao.split(",") if t.strip()]
+        df = df[df['tipo_solicitacao'].isin(types)]
 
         if periodo_inicio:
             df = df[df['dt'] >= pd.to_datetime(periodo_inicio)]
