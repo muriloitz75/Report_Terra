@@ -1,6 +1,5 @@
 import requests
 import sys
-import os
 
 def main():
     if len(sys.argv) < 3:

@@ -9,7 +9,7 @@ import os
 import io
 import pandas as pd
 import gc
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict, Any
 from pydantic import BaseModel
 from process_pdf import parse_pdf
 import tempfile
@@ -433,7 +433,6 @@ def process_pdf_background(tmp_path: str, user_id: int):
             return
 
         from models import Process
-        from datetime import datetime
 
         BATCH_SIZE = 500
         
@@ -905,11 +904,31 @@ def export_excel(
         )
         df = df[mask]
 
-    # Sort by date (most recent first)
-    if only_delayed and 'dias_atraso_calc' in df.columns:
-        df = df.sort_values('dias_atraso_calc', ascending=False)
-    elif 'dt' in df.columns:
-        df = df.sort_values('dt', ascending=False)
+    # Pre-process columns and fill null/empty values with "SEM REGISTRO"
+    def clean_val(val, fallback="SEM REGISTRO"):
+        if pd.isna(val) or val is None:
+            return fallback
+        s = str(val).strip()
+        if not s or s.upper() in ['NAN', 'NONE', 'NAT']:
+            return fallback
+        return s
+
+    if 'tipo_solicitacao' in df.columns:
+        df['tipo_solicitacao'] = df['tipo_solicitacao'].apply(lambda x: clean_val(x, "SEM REGISTRO"))
+    else:
+        df['tipo_solicitacao'] = "SEM REGISTRO"
+
+    if 'data_abertura' in df.columns:
+        df['dt_sort'] = df['dt'].fillna(pd.Timestamp.min)
+    else:
+        df['dt_sort'] = pd.Timestamp.min
+
+    if 'contribuinte' in df.columns:
+        df['contribuinte'] = df['contribuinte'].apply(lambda x: clean_val(x, "SEM REGISTRO"))
+
+    # Sort by: 1. tipo_solicitacao (alphabetically ascending)
+    #          2. dt_sort (date, descending)
+    df = df.sort_values(by=['tipo_solicitacao', 'dt_sort'], ascending=[True, False])
 
     # Build Excel in memory
     output = io.BytesIO()
@@ -920,7 +939,7 @@ def export_excel(
     header_fmt = workbook.add_format({
         'bold': True,
         'font_color': '#FFFFFF',
-        'bg_color': '#1E3A5F',
+        'bg_color': '#1F4E79',
         'border': 1,
         'border_color': '#B0BEC5',
         'align': 'center',
@@ -928,60 +947,146 @@ def export_excel(
         'font_size': 11,
         'text_wrap': True,
     })
-    cell_fmt = workbook.add_format({
+    
+    # Zebra striping cell formats
+    cell_left_even = workbook.add_format({
         'border': 1,
         'border_color': '#D0D5DD',
         'font_size': 10,
         'valign': 'vcenter',
+        'align': 'left',
+        'bg_color': '#FFFFFF',
     })
-    cell_center_fmt = workbook.add_format({
+    cell_left_odd = workbook.add_format({
+        'border': 1,
+        'border_color': '#D0D5DD',
+        'font_size': 10,
+        'valign': 'vcenter',
+        'align': 'left',
+        'bg_color': '#F8F9FA',
+    })
+    
+    cell_center_even = workbook.add_format({
+        'border': 1,
+        'border_color': '#D0D5DD',
+        'font_size': 10,
+        'valign': 'vcenter',
+        'align': 'center',
+        'bg_color': '#FFFFFF',
+    })
+    cell_center_odd = workbook.add_format({
+        'border': 1,
+        'border_color': '#D0D5DD',
+        'font_size': 10,
+        'valign': 'vcenter',
+        'align': 'center',
+        'bg_color': '#F8F9FA',
+    })
+    
+    delay_even = workbook.add_format({
         'border': 1,
         'border_color': '#D0D5DD',
         'font_size': 10,
         'align': 'center',
         'valign': 'vcenter',
+        'bold': True,
+        'font_color': '#DC2626',
+        'bg_color': '#FFFFFF',
     })
-    cell_right_fmt = workbook.add_format({
+    delay_odd = workbook.add_format({
         'border': 1,
         'border_color': '#D0D5DD',
         'font_size': 10,
-        'align': 'right',
-        'valign': 'vcenter',
-    })
-    delay_fmt = workbook.add_format({
-        'border': 1,
-        'border_color': '#D0D5DD',
-        'font_size': 10,
-        'align': 'right',
+        'align': 'center',
         'valign': 'vcenter',
         'bold': True,
         'font_color': '#DC2626',
+        'bg_color': '#F8F9FA',
     })
-    # Status formats
+    
+    # Status formats (Uppercase & Bold)
     status_green = workbook.add_format({
         'border': 1, 'border_color': '#D0D5DD', 'font_size': 10,
-        'align': 'center', 'valign': 'vcenter',
-        'bg_color': '#DCFCE7', 'font_color': '#166534',
+        'align': 'center', 'valign': 'vcenter', 'bold': True,
+        'bg_color': '#E2EFDA', 'font_color': '#385723',
     })
     status_red = workbook.add_format({
         'border': 1, 'border_color': '#D0D5DD', 'font_size': 10,
-        'align': 'center', 'valign': 'vcenter',
+        'align': 'center', 'valign': 'vcenter', 'bold': True,
         'bg_color': '#FEE2E2', 'font_color': '#991B1B',
     })
     status_blue = workbook.add_format({
         'border': 1, 'border_color': '#D0D5DD', 'font_size': 10,
-        'align': 'center', 'valign': 'vcenter',
+        'align': 'center', 'valign': 'vcenter', 'bold': True,
         'bg_color': '#DBEAFE', 'font_color': '#1E40AF',
     })
     status_orange = workbook.add_format({
         'border': 1, 'border_color': '#D0D5DD', 'font_size': 10,
-        'align': 'center', 'valign': 'vcenter',
+        'align': 'center', 'valign': 'vcenter', 'bold': True,
         'bg_color': '#FFEDD5', 'font_color': '#9A3412',
     })
     status_gray = workbook.add_format({
         'border': 1, 'border_color': '#D0D5DD', 'font_size': 10,
-        'align': 'center', 'valign': 'vcenter',
+        'align': 'center', 'valign': 'vcenter', 'bold': True,
         'bg_color': '#F3F4F6', 'font_color': '#374151',
+    })
+
+    # Subtotal formats
+    subtotal_row_fmt = workbook.add_format({
+        'bg_color': '#DDEBF7',
+        'border': 1,
+        'border_color': '#D0D5DD',
+        'bold': True,
+        'valign': 'vcenter',
+    })
+    subtotal_label_fmt = workbook.add_format({
+        'bg_color': '#DDEBF7',
+        'border': 1,
+        'border_color': '#D0D5DD',
+        'bold': True,
+        'align': 'left',
+        'valign': 'vcenter',
+        'font_size': 10,
+        'text_wrap': True,
+    })
+    subtotal_qty_fmt = workbook.add_format({
+        'bg_color': '#DDEBF7',
+        'border': 1,
+        'border_color': '#D0D5DD',
+        'bold': True,
+        'align': 'center',
+        'valign': 'vcenter',
+        'font_size': 10,
+        'font_color': '#1F4E79',
+    })
+
+    # Grand Total formats
+    total_geral_row_fmt = workbook.add_format({
+        'bg_color': '#BCD6EE',
+        'border': 1,
+        'border_color': '#D0D5DD',
+        'bold': True,
+        'valign': 'vcenter',
+    })
+    total_geral_label_fmt = workbook.add_format({
+        'bg_color': '#BCD6EE',
+        'border': 1,
+        'border_color': '#D0D5DD',
+        'bold': True,
+        'align': 'left',
+        'valign': 'vcenter',
+        'font_size': 10,
+        'font_color': '#1F4E79',
+    })
+    total_geral_qty_fmt = workbook.add_format({
+        'bg_color': '#BCD6EE',
+        'border': 1,
+        'border_color': '#D0D5DD',
+        'bold': True,
+        'align': 'center',
+        'valign': 'vcenter',
+        'font_size': 10,
+        'font_color': '#1F4E79',
     })
 
     # Title row
@@ -991,7 +1096,7 @@ def export_excel(
     subtitle_fmt = workbook.add_format({
         'font_size': 10, 'font_color': '#64748B', 'italic': True,
     })
-    worksheet.merge_range('A1:F1', 'Report Terra - Processos', title_fmt)
+    worksheet.merge_range('A1:H1', 'Report Terra - Processos', title_fmt)
     export_time = datetime.now().strftime('%d/%m/%Y %H:%M')
     filters_desc = []
     if start_date or end_date:
@@ -1008,72 +1113,252 @@ def export_excel(
     if filters_desc:
         subtitle += f" | Filtros: {', '.join(filters_desc)}"
     subtitle += f" | Total: {len(df)} registros"
-    worksheet.merge_range('A2:F2', subtitle, subtitle_fmt)
+    worksheet.merge_range('A2:H2', subtitle, subtitle_fmt)
 
-    # Headers (row 3, index 2)
-    headers = ['Nº Proc. / Ano', 'Contribuinte', 'Data Abertura', 'Situação', 'Tipo de Solicitação', 'Dias Atraso']
-    col_widths = [18, 35, 15, 20, 40, 14]
+    # Headers (row 3, index 3 in 0-indexed excel)
+    headers = ['Nº Proc. / Ano', 'Contribuinte', 'Data Abertura', 'Mês/Ano', 'Situação', 'Tipo de Solicitação', 'Dias Atraso', 'Quantidade']
+    col_widths = [16, 35, 15, 12, 16, 45, 12, 12]
     for col, (header, width) in enumerate(zip(headers, col_widths)):
         worksheet.write(3, col, header, header_fmt)
         worksheet.set_column(col, col, width)
 
-    # Data rows
+    # Data rows and Grouping logic
     def get_status_fmt(status_val):
-        if any(s in str(status_val) for s in ['ENCERRAMENTO', 'DEFERIDO']):
+        status_str = str(status_val).upper()
+        if any(s in status_str for s in ['ENCERRAMENTO', 'DEFERIDO']):
             return status_green
-        if any(s in str(status_val) for s in ['INDEFERIDO', 'CANCELADO']):
+        if any(s in status_str for s in ['INDEFERIDO', 'CANCELADO']):
             return status_red
-        if str(status_val) in ['ANDAMENTO', 'EM DILIGENCIA']:
+        if any(s in status_str for s in ['ANDAMENTO', 'EM DILIGENCIA']):
             return status_blue
-        if str(status_val) in ['RETORNO', 'PENDENCIA', 'SUSPENSO']:
+        if any(s in status_str for s in ['RETORNO', 'PENDENCIA', 'SUSPENSO']):
             return status_orange
         return status_gray
 
-    for row_idx, (_, row) in enumerate(df.iterrows(), start=4):
-        worksheet.write(row_idx, 0, str(row.get('id', '')), cell_center_fmt)
-        worksheet.write(row_idx, 1, str(row.get('contribuinte', '')), cell_fmt)
-        worksheet.write(row_idx, 2, str(row.get('data_abertura', '')), cell_center_fmt)
-        worksheet.write(row_idx, 3, str(row.get('status', '')), get_status_fmt(row.get('status', '')))
-        worksheet.write(row_idx, 4, str(row.get('tipo_solicitacao', '')), cell_fmt)
+    PORTUGUESE_MONTHS = {
+        1: 'jan', 2: 'fev', 3: 'mar', 4: 'abr', 5: 'mai', 6: 'jun',
+        7: 'jul', 8: 'ago', 9: 'set', 10: 'out', 11: 'nov', 12: 'dez'
+    }
 
-        is_delayed = row.get('is_atrasado', False)
-        delay_days = row.get('dias_atraso_calc', 0)
-        if is_delayed and delay_days:
-            worksheet.write(row_idx, 5, f"{delay_days} dias", delay_fmt)
+    current_row = 4
+    data_row_count = 0
+
+    for tipo_sol, group_df in df.groupby('tipo_solicitacao', sort=False):
+        group_start_excel = current_row + 1
+        for _, row in group_df.iterrows():
+            is_odd = (data_row_count % 2 != 0)
+            cell_center = cell_center_odd if is_odd else cell_center_even
+            cell_left = cell_left_odd if is_odd else cell_left_even
+            delay_cell = delay_odd if is_odd else delay_even
+
+            # Col 0: Nº Proc. / Ano
+            worksheet.write(current_row, 0, clean_val(row.get('id')), cell_center)
+            
+            # Col 1: Contribuinte
+            worksheet.write(current_row, 1, clean_val(row.get('contribuinte')), cell_left)
+            
+            # Col 2: Data Abertura
+            data_ab_str = clean_val(row.get('data_abertura'))
+            worksheet.write(current_row, 2, data_ab_str, cell_center)
+            
+            # Col 3: Mês/Ano
+            dt_val = row.get('dt')
+            if pd.notna(dt_val):
+                mes_ano = f"{PORTUGUESE_MONTHS[dt_val.month]}/{dt_val.year}"
+            else:
+                mes_ano = "SEM REGISTRO"
+            worksheet.write(current_row, 3, mes_ano, cell_center)
+            
+            # Col 4: Situação
+            status_val = clean_val(row.get('status')).upper()
+            worksheet.write(current_row, 4, status_val, get_status_fmt(status_val))
+            
+            # Col 5: Tipo de Solicitação
+            worksheet.write(current_row, 5, tipo_sol, cell_left)
+            
+            # Col 6: Dias Atraso
+            is_delayed = row.get('is_atrasado', False)
+            delay_days = row.get('dias_atraso_calc')
+            if is_delayed and pd.notna(delay_days):
+                try:
+                    days_int = int(delay_days)
+                    val_to_write = f"{days_int} dias" if days_int > 0 else '-'
+                except Exception:
+                    val_to_write = "SEM REGISTRO"
+                worksheet.write(current_row, 6, val_to_write, delay_cell)
+            else:
+                worksheet.write(current_row, 6, '-', cell_center)
+
+            # Col 7: Quantidade (empty for normal data rows)
+            worksheet.write(current_row, 7, '', cell_center)
+
+            current_row += 1
+            data_row_count += 1
+
+        # Write Group Subtotal Row
+        group_end_excel = current_row
+        group_size = len(group_df)
+        for c in range(8):
+            if c == 1:
+                worksheet.write(current_row, c, "Total", subtotal_label_fmt)
+            elif c == 5:
+                worksheet.write(current_row, c, tipo_sol, subtotal_label_fmt)
+            elif c == 7:
+                # Use SUBTOTAL formula (function 3 counts non-empty visible cells in column A)
+                worksheet.write_formula(current_row, c, f"=SUBTOTAL(3, A{group_start_excel}:A{group_end_excel})", subtotal_qty_fmt, group_size)
+            else:
+                worksheet.write(current_row, c, '', subtotal_row_fmt)
+        
+        current_row += 1
+
+    # Write TOTAL GERAL Grand Total Row
+    total_count = len(df)
+    last_row_excel = current_row
+    for c in range(8):
+        if c == 1:
+            worksheet.write(current_row, c, "TOTAL GERAL", total_geral_label_fmt)
+        elif c == 7:
+            # Use SUBTOTAL formula to count all visible rows, Excel automatically ignores nested SUBTOTALs
+            worksheet.write_formula(current_row, c, f"=SUBTOTAL(3, A5:A{last_row_excel})", total_geral_qty_fmt, total_count)
         else:
-            worksheet.write(row_idx, 5, '-', cell_center_fmt)
+            worksheet.write(current_row, c, '', total_geral_row_fmt)
+
+    current_row += 1
 
     # --- Resumo / Contabilização no Final ---
-    summary_row = 4 + len(df) + 2
-    
-    total_count = len(df)
-    andamento_count = len(df[df['status'] == 'ANDAMENTO']) if 'status' in df.columns else 0
-    encerrados_count = len(df[df['status'].str.contains('ENCERRAMENTO|DEFERIDO|INDEFERIDO', na=False, case=False)]) if 'status' in df.columns else 0
-    atrasados_count = len(df[df['is_atrasado'] == True]) if 'is_atrasado' in df.columns else 0
+    summary_row = current_row + 2
 
+    # Formatting definitions for Conditional Formatting
     summary_title_fmt = workbook.add_format({
-        'bold': True, 'font_size': 12, 'font_color': '#1E3A5F', 'bottom': 1, 'border_color': '#B0BEC5'
-    })
-    summary_label_fmt = workbook.add_format({
-        'bold': True, 'font_size': 10, 'align': 'right'
+        'bold': True, 'font_size': 12, 'font_color': '#1F4E79'
     })
     summary_value_fmt = workbook.add_format({
-        'font_size': 10, 'align': 'left', 'bold': True
+        'font_size': 10, 'align': 'left', 'valign': 'vcenter'
     })
 
-    worksheet.merge_range(summary_row, 0, summary_row, 1, "Resumo (Contabilização)", summary_title_fmt)
+    cond_header_fmt = workbook.add_format({
+        'bold': True,
+        'font_size': 10,
+        'font_color': '#FFFFFF',
+        'bg_color': '#1F4E79',
+        'align': 'left',
+        'valign': 'vcenter',
+        'border': 1,
+        'border_color': '#D9D9D9'
+    })
     
-    worksheet.write(summary_row + 1, 0, "Total Geral:", summary_label_fmt)
-    worksheet.write(summary_row + 1, 1, total_count, summary_value_fmt)
+    cond_header_qty_fmt = workbook.add_format({
+        'bold': True,
+        'font_size': 10,
+        'font_color': '#FFFFFF',
+        'bg_color': '#1F4E79',
+        'align': 'center',
+        'valign': 'vcenter',
+        'border': 1,
+        'border_color': '#D9D9D9'
+    })
+
+    cond_data_fmt = workbook.add_format({
+        'font_size': 9,
+        'font_color': '#333333',
+        'bg_color': '#FFFFFF',
+        'align': 'left',
+        'valign': 'vcenter',
+        'border': 1,
+        'border_color': '#E0E0E0'
+    })
+
+    cond_data_zebra_fmt = workbook.add_format({
+        'font_size': 9,
+        'font_color': '#333333',
+        'bg_color': '#F8F9FA',
+        'align': 'left',
+        'valign': 'vcenter',
+        'border': 1,
+        'border_color': '#E0E0E0'
+    })
+
+    cond_qty_fmt = workbook.add_format({
+        'bold': True,
+        'font_size': 9,
+        'font_color': '#1F4E79',
+        'bg_color': '#F2F4F7',
+        'align': 'center',
+        'valign': 'vcenter',
+        'border': 1,
+        'border_color': '#E0E0E0'
+    })
+
+    # Title Row (merged A-C)
+    title_formula = f'=IF(SUBTOTAL(3, $A$5:$A${last_row_excel}) = COUNTA($A$5:$A${last_row_excel}), "", "Contabilização por Tipo de Solicitação (Filtro Dinâmico)")'
+    worksheet.merge_range(summary_row, 0, summary_row, 2, "", summary_title_fmt)
+    worksheet.write_formula(summary_row, 0, title_formula, summary_title_fmt, "")
     
-    worksheet.write(summary_row + 2, 0, "Em Andamento:", summary_label_fmt)
-    worksheet.write(summary_row + 2, 1, andamento_count, summary_value_fmt)
+    # Table Header Row (A-B for Label, C for Qtd)
+    header_label_formula = f'=IF(SUBTOTAL(3, $A$5:$A${last_row_excel}) = COUNTA($A$5:$A${last_row_excel}), "", "Tipo de Solicitação")'
+    header_qty_formula = f'=IF(SUBTOTAL(3, $A$5:$A${last_row_excel}) = COUNTA($A$5:$A${last_row_excel}), "", "Qtd")'
+    worksheet.write_formula(summary_row + 1, 0, header_label_formula, summary_value_fmt, "")
+    worksheet.write(summary_row + 1, 1, "", summary_value_fmt)
+    worksheet.write_formula(summary_row + 1, 2, header_qty_formula, summary_value_fmt, "")
+    
+    unique_types = sorted(df['tipo_solicitacao'].unique())
+    
+    # Write the formula for unique visible request types in Column A (spilled)
+    unique_formula = (
+        f'=IF(SUBTOTAL(3, $A$5:$A${last_row_excel}) = COUNTA($A$5:$A${last_row_excel}), "", '
+        f'IFERROR(UNIQUE(FILTER($F$5:$F${last_row_excel}, ($A$5:$A${last_row_excel}<>"") * '
+        f'SUBTOTAL(3, OFFSET($A$5, ROW($A$5:$A${last_row_excel})-ROW($A$5), 0, 1)))), ""))'
+    )
+    worksheet.write_formula(summary_row + 2, 0, unique_formula, summary_value_fmt, "")
+    
+    # Write formulas for counts in Column C (only where Column A spilled values exist)
+    for idx in range(len(unique_types)):
+        r = summary_row + 2 + idx
+        excel_row_num = r + 1
+        
+        worksheet.write(r, 1, "", summary_value_fmt)
+        
+        count_formula = (
+            f'=IF(A{excel_row_num}="", "", '
+            f'SUMPRODUCT(($A$5:$A${last_row_excel}<>"") * ($F$5:$F${last_row_excel}=A{excel_row_num}) * '
+            f'SUBTOTAL(3, OFFSET($A$5, ROW($A$5:$A${last_row_excel})-ROW($A$5), 0, 1))))'
+        )
+        worksheet.write_formula(r, 2, count_formula, summary_value_fmt, "")
+        
+    # Apply Conditional Formatting to style the panel only when filtered (using ref_cell $A${summary_row + 3})
+    ref_cell = f"$A${summary_row + 3}"
+    
+    # 1. Header row formatting
+    worksheet.conditional_format(summary_row + 1, 0, summary_row + 1, 1, {
+        'type': 'formula',
+        'criteria': f'={ref_cell}<>""',
+        'format': cond_header_fmt
+    })
+    worksheet.conditional_format(summary_row + 1, 2, summary_row + 1, 2, {
+        'type': 'formula',
+        'criteria': f'={ref_cell}<>""',
+        'format': cond_header_qty_fmt
+    })
+    
+    # 2. Data rows formatting
+    for idx in range(len(unique_types)):
+        r = summary_row + 2 + idx
+        excel_row_num = r + 1
+        fmt_to_use = cond_data_zebra_fmt if idx % 2 == 1 else cond_data_fmt
+        
+        worksheet.conditional_format(r, 0, r, 1, {
+            'type': 'formula',
+            'criteria': f'=$A${excel_row_num}<>""',
+            'format': fmt_to_use
+        })
+        worksheet.conditional_format(r, 2, r, 2, {
+            'type': 'formula',
+            'criteria': f'=$A${excel_row_num}<>""',
+            'format': cond_qty_fmt
+        })
 
-    worksheet.write(summary_row + 3, 0, "Encerrados / Resolvidos:", summary_label_fmt)
-    worksheet.write(summary_row + 3, 1, encerrados_count, summary_value_fmt)
-
-    worksheet.write(summary_row + 4, 0, "Com Atraso:", summary_label_fmt)
-    worksheet.write(summary_row + 4, 1, atrasados_count, summary_value_fmt)
+    # Enable autofilter on all data columns (excluding the Grand Total row)
+    worksheet.autofilter(3, 0, current_row - 2, 7)
 
     # Freeze header row
     worksheet.freeze_panes(4, 0)

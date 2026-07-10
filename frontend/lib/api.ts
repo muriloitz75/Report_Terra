@@ -318,3 +318,8 @@ export const shutdownApp = async (): Promise<void> => {
         // Ignore error as server dies
     }
 };
+
+export const IDLE_TIMEOUT_KEY = 'idle_timeout_minutes';
+export const IDLE_TIMEOUT_OPTIONS = [10, 25, 35, 50] as const;
+export type IdleTimeoutOption = typeof IDLE_TIMEOUT_OPTIONS[number] | 'disabled';
+

@@ -14,6 +14,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 import { ReportProvider } from "@/context/ReportContext";
 import { SessionProvider } from "./SessionProvider";
 import { PermissionsProvider } from "@/context/PermissionsContext";
+import { IdleLockScreen } from "@/components/idle-lock-screen";
 
 export const metadata: Metadata = {
   title: "Report Terra",
@@ -43,6 +44,7 @@ export default function RootLayout({
                     {children}
                   </main>
                 </div>
+                <IdleLockScreen />
               </PermissionsProvider>
             </SessionProvider>
           </ReportProvider>
@@ -51,3 +53,4 @@ export default function RootLayout({
     </html>
   );
 }
+

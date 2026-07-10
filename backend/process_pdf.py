@@ -1,7 +1,7 @@
 import pdfplumber
 import re
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
 import unicodedata
 from tipo_resolver import resolve_tipo

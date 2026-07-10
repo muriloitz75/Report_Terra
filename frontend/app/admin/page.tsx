@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Shield, Check, X, Loader2, UserX, RefreshCw, UserCheck, Trash2 } from 'lucide-react';
+import { Shield, Check, X, Loader2, UserX, RefreshCw, UserCheck, Trash2, Clock, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { getAdminUsers, updateAdminUser, deactivateAdminUser, deleteAdminUser, AdminUser } from '@/lib/api';
+import { getAdminUsers, updateAdminUser, deactivateAdminUser, deleteAdminUser, AdminUser, IDLE_TIMEOUT_KEY, IDLE_TIMEOUT_OPTIONS } from '@/lib/api';
+
 
 export default function AdminPage() {
     const { data: session, status } = useSession();
@@ -17,6 +18,24 @@ export default function AdminPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [updatingId, setUpdatingId] = useState<number | null>(null);
+    const [idleTimeout, setIdleTimeout] = useState<string>('10');
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const val = localStorage.getItem(IDLE_TIMEOUT_KEY) || '10';
+            setIdleTimeout(val);
+        }
+    }, []);
+
+    const handleIdleTimeoutChange = (value: string) => {
+        setIdleTimeout(value);
+        localStorage.setItem(IDLE_TIMEOUT_KEY, value);
+        // Dispatch custom storage event so current tab updates its listener instantly
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('storage'));
+        }
+    };
+
 
     useEffect(() => {
         if (status === 'loading') return;
@@ -196,7 +215,56 @@ export default function AdminPage() {
                 </div>
             )}
 
+            {/* Configurações do Sistema - Tela de Descanso */}
+            <Card>
+                <CardHeader className="pb-3 flex flex-row items-center gap-3">
+                    <div className="bg-blue-100 dark:bg-blue-900/20 p-2 rounded-lg text-blue-600 dark:text-blue-400">
+                        <Clock className="w-4.5 h-4.5" />
+                    </div>
+                    <div>
+                        <CardTitle className="text-base">Tela de Descanso (Segurança)</CardTitle>
+                        <CardDescription className="text-xs">Defina o tempo de inatividade necessário para exigir uma nova senha de acesso.</CardDescription>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+                        <div className="space-y-1">
+                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Tempo limite de inatividade</span>
+                            <p className="text-[11px] text-slate-500">Qualquer movimento de mouse, digitação ou clique redefinirá o cronômetro.</p>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 bg-slate-200 dark:bg-slate-800 p-1 rounded-lg">
+                            {IDLE_TIMEOUT_OPTIONS.map((option) => (
+                                <button
+                                    key={option}
+                                    type="button"
+                                    onClick={() => handleIdleTimeoutChange(option.toString())}
+                                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                                        idleTimeout === option.toString()
+                                            ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                                            : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                                    }`}
+                                >
+                                    {option} min
+                                </button>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={() => handleIdleTimeoutChange("disabled")}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                                    idleTimeout === "disabled"
+                                        ? "bg-red-500 text-white shadow-sm"
+                                        : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                                }`}
+                            >
+                                Desabilitado
+                            </button>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
             {pendingUsers.length > 0 && (
+
                 <Card className="border-amber-200 dark:border-amber-800">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base">Solicitações de Cadastro ({pendingUsers.length})</CardTitle>
