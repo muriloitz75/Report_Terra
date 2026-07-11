@@ -56,6 +56,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -194,6 +195,15 @@ try:
             conn.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_processes_status ON processes (status)"))
             conn.execute(sa_text("CREATE INDEX IF NOT EXISTS ix_processes_tipo_solicitacao ON processes (tipo_solicitacao)"))
             conn.commit()
+except Exception:
+    pass
+
+# Migrate: add setor_cadastro_usuario column to processes if missing
+try:
+    from sqlalchemy import text as sa_text
+    with engine.connect() as conn:
+        conn.execute(sa_text("ALTER TABLE processes ADD COLUMN setor_cadastro_usuario VARCHAR"))
+        conn.commit()
 except Exception:
     pass
 
@@ -466,6 +476,7 @@ def process_pdf_background(tmp_path: str, user_id: int):
                 data_abertura=item['data_abertura'],
                 ano=item['ano'],
                 status=item['status'],
+                setor_cadastro_usuario=item.get('setor_cadastro_usuario', ''),
                 setor_atual=item['setor_atual'],
                 tipo_solicitacao=item['tipo_solicitacao'],
                 dias_atraso_pdf=item['dias_atraso_pdf'],
@@ -853,14 +864,22 @@ def export_excel(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     only_delayed: bool = False,
+    sheet_name: Optional[str] = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Export filtered processes to a formatted Excel file."""
+    import re
     import xlsxwriter
     from datetime import datetime
+    from urllib.parse import quote
     from models import Process
     require_view_permission(user, "can_view_processes", "Permissão negada.")
+
+    # Sanitize sheet name to comply with Excel's rules (max 31 chars, no : \ / ? * [ ])
+    clean_sheet_name = re.sub(r'[:\\/?*\[\]]', '', (sheet_name or '').strip())[:31]
+    if not clean_sheet_name:
+        clean_sheet_name = 'Processos'
 
     # Query Database
     query = db.query(Process).filter(Process.user_id == user.id)
@@ -933,7 +952,7 @@ def export_excel(
     # Build Excel in memory
     output = io.BytesIO()
     workbook = xlsxwriter.Workbook(output, {'in_memory': True})
-    worksheet = workbook.add_worksheet('Processos')
+    worksheet = workbook.add_worksheet(clean_sheet_name)
 
     # --- Formats ---
     header_fmt = workbook.add_format({
@@ -1096,7 +1115,7 @@ def export_excel(
     subtitle_fmt = workbook.add_format({
         'font_size': 10, 'font_color': '#64748B', 'italic': True,
     })
-    worksheet.merge_range('A1:H1', 'Report Terra - Processos', title_fmt)
+    worksheet.merge_range('A1:K1', 'Report Terra - Processos', title_fmt)
     export_time = datetime.now().strftime('%d/%m/%Y %H:%M')
     filters_desc = []
     if start_date or end_date:
@@ -1113,11 +1132,11 @@ def export_excel(
     if filters_desc:
         subtitle += f" | Filtros: {', '.join(filters_desc)}"
     subtitle += f" | Total: {len(df)} registros"
-    worksheet.merge_range('A2:H2', subtitle, subtitle_fmt)
+    worksheet.merge_range('A2:K2', subtitle, subtitle_fmt)
 
     # Headers (row 3, index 3 in 0-indexed excel)
-    headers = ['Nº Proc. / Ano', 'Contribuinte', 'Data Abertura', 'Mês/Ano', 'Situação', 'Tipo de Solicitação', 'Dias Atraso', 'Quantidade']
-    col_widths = [16, 35, 15, 12, 16, 45, 12, 12]
+    headers = ['Nº Proc. / Ano', 'Contribuinte', 'Data Abertura', 'Mês', 'Ano', 'Situação', 'Tipo de Solicitação', 'Setor de Cadastro / Usuário', 'Setor Atual', 'Dias Atraso', 'Quantidade']
+    col_widths = [16, 35, 15, 10, 8, 16, 45, 32, 32, 12, 12]
     for col, (header, width) in enumerate(zip(headers, col_widths)):
         worksheet.write(3, col, header, header_fmt)
         worksheet.set_column(col, col, width)
@@ -1161,22 +1180,31 @@ def export_excel(
             data_ab_str = clean_val(row.get('data_abertura'))
             worksheet.write(current_row, 2, data_ab_str, cell_center)
             
-            # Col 3: Mês/Ano
+            # Col 3: Mês / Col 4: Ano
             dt_val = row.get('dt')
             if pd.notna(dt_val):
-                mes_ano = f"{PORTUGUESE_MONTHS[dt_val.month]}/{dt_val.year}"
+                mes_val = PORTUGUESE_MONTHS[dt_val.month]
+                ano_val = dt_val.year
             else:
-                mes_ano = "SEM REGISTRO"
-            worksheet.write(current_row, 3, mes_ano, cell_center)
-            
-            # Col 4: Situação
+                mes_val = "SEM REGISTRO"
+                ano_val = "SEM REGISTRO"
+            worksheet.write(current_row, 3, mes_val, cell_center)
+            worksheet.write(current_row, 4, ano_val, cell_center)
+
+            # Col 5: Situação
             status_val = clean_val(row.get('status')).upper()
-            worksheet.write(current_row, 4, status_val, get_status_fmt(status_val))
-            
-            # Col 5: Tipo de Solicitação
-            worksheet.write(current_row, 5, tipo_sol, cell_left)
-            
-            # Col 6: Dias Atraso
+            worksheet.write(current_row, 5, status_val, get_status_fmt(status_val))
+
+            # Col 6: Tipo de Solicitação
+            worksheet.write(current_row, 6, tipo_sol, cell_left)
+
+            # Col 7: Setor de Cadastro / Usuário
+            worksheet.write(current_row, 7, clean_val(row.get('setor_cadastro_usuario')), cell_left)
+
+            # Col 8: Setor Atual
+            worksheet.write(current_row, 8, clean_val(row.get('setor_atual')), cell_left)
+
+            # Col 9: Dias Atraso
             is_delayed = row.get('is_atrasado', False)
             delay_days = row.get('dias_atraso_calc')
             if is_delayed and pd.notna(delay_days):
@@ -1185,12 +1213,12 @@ def export_excel(
                     val_to_write = f"{days_int} dias" if days_int > 0 else '-'
                 except Exception:
                     val_to_write = "SEM REGISTRO"
-                worksheet.write(current_row, 6, val_to_write, delay_cell)
+                worksheet.write(current_row, 9, val_to_write, delay_cell)
             else:
-                worksheet.write(current_row, 6, '-', cell_center)
+                worksheet.write(current_row, 9, '-', cell_center)
 
-            # Col 7: Quantidade (empty for normal data rows)
-            worksheet.write(current_row, 7, '', cell_center)
+            # Col 10: Quantidade (empty for normal data rows)
+            worksheet.write(current_row, 10, '', cell_center)
 
             current_row += 1
             data_row_count += 1
@@ -1198,26 +1226,26 @@ def export_excel(
         # Write Group Subtotal Row
         group_end_excel = current_row
         group_size = len(group_df)
-        for c in range(8):
+        for c in range(11):
             if c == 1:
                 worksheet.write(current_row, c, "Total", subtotal_label_fmt)
-            elif c == 5:
+            elif c == 6:
                 worksheet.write(current_row, c, tipo_sol, subtotal_label_fmt)
-            elif c == 7:
+            elif c == 10:
                 # Use SUBTOTAL formula (function 3 counts non-empty visible cells in column A)
                 worksheet.write_formula(current_row, c, f"=SUBTOTAL(3, A{group_start_excel}:A{group_end_excel})", subtotal_qty_fmt, group_size)
             else:
                 worksheet.write(current_row, c, '', subtotal_row_fmt)
-        
+
         current_row += 1
 
     # Write TOTAL GERAL Grand Total Row
     total_count = len(df)
     last_row_excel = current_row
-    for c in range(8):
+    for c in range(11):
         if c == 1:
             worksheet.write(current_row, c, "TOTAL GERAL", total_geral_label_fmt)
-        elif c == 7:
+        elif c == 10:
             # Use SUBTOTAL formula to count all visible rows, Excel automatically ignores nested SUBTOTALs
             worksheet.write_formula(current_row, c, f"=SUBTOTAL(3, A5:A{last_row_excel})", total_geral_qty_fmt, total_count)
         else:
@@ -1306,7 +1334,7 @@ def export_excel(
     # Write the formula for unique visible request types in Column A (spilled)
     unique_formula = (
         f'=IF(SUBTOTAL(3, $A$5:$A${last_row_excel}) = COUNTA($A$5:$A${last_row_excel}), "", '
-        f'IFERROR(UNIQUE(FILTER($F$5:$F${last_row_excel}, ($A$5:$A${last_row_excel}<>"") * '
+        f'IFERROR(UNIQUE(FILTER($G$5:$G${last_row_excel}, ($A$5:$A${last_row_excel}<>"") * '
         f'SUBTOTAL(3, OFFSET($A$5, ROW($A$5:$A${last_row_excel})-ROW($A$5), 0, 1)))), ""))'
     )
     worksheet.write_formula(summary_row + 2, 0, unique_formula, summary_value_fmt, "")
@@ -1320,7 +1348,7 @@ def export_excel(
         
         count_formula = (
             f'=IF(A{excel_row_num}="", "", '
-            f'SUMPRODUCT(($A$5:$A${last_row_excel}<>"") * ($F$5:$F${last_row_excel}=A{excel_row_num}) * '
+            f'SUMPRODUCT(($A$5:$A${last_row_excel}<>"") * ($G$5:$G${last_row_excel}=A{excel_row_num}) * '
             f'SUBTOTAL(3, OFFSET($A$5, ROW($A$5:$A${last_row_excel})-ROW($A$5), 0, 1))))'
         )
         worksheet.write_formula(r, 2, count_formula, summary_value_fmt, "")
@@ -1358,7 +1386,7 @@ def export_excel(
         })
 
     # Enable autofilter on all data columns (excluding the Grand Total row)
-    worksheet.autofilter(3, 0, current_row - 2, 7)
+    worksheet.autofilter(3, 0, current_row - 2, 10)
 
     # Freeze header row
     worksheet.freeze_panes(4, 0)
@@ -1371,11 +1399,14 @@ def export_excel(
     del df
     gc.collect()
 
-    filename = f"Report_Terra_Processos_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    safe_filename_base = re.sub(r'[<>:"/\\|?*]', '_', clean_sheet_name).strip() or 'Processos'
+    filename = f"{safe_filename_base}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    ascii_filename = filename.encode('ascii', 'ignore').decode('ascii') or 'Processos.xlsx'
+    encoded_filename = quote(filename)
     return StreamingResponse(
         output,
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        headers={'Content-Disposition': f'attachment; filename="{filename}"'}
+        headers={'Content-Disposition': f'attachment; filename="{ascii_filename}"; filename*=UTF-8\'\'{encoded_filename}'}
     )
 
 # --- ADMIN ENDPOINTS ---

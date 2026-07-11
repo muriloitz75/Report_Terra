@@ -40,6 +40,7 @@ class Process(Base):
     data_abertura = Column(String) # Keeping as string to match legacy regex format, or could migrate to Date
     ano = Column(String)
     status = Column(String, index=True)
+    setor_cadastro_usuario = Column(String)
     setor_atual = Column(String)
     tipo_solicitacao = Column(String, index=True)
     

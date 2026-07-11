@@ -28,14 +28,15 @@ def parse_pdf(pdf_path, progress_callback=None, cancel_check=None):
     Parse a Sistema Terra PDF report using bounding-box column detection.
 
     PDF Column X boundaries (confirmed from header row via extract_words):
-      ID         : x < 85
-      Contribuinte: 85 <= x < 213
-      Datas      : 213 <= x < 390
-      Status     : 390 <= x < 487   (Situação column - "Setor de Cadastro" overlaps but Status is at ~389)
-      Setor Atual: 487 <= x < 581
-      Tipo       : 581 <= x < 676
-      Titulo     : 676 <= x < 772
-      Dias       : x >= 772
+      ID              : x < 85
+      Contribuinte     : 85 <= x < 213
+      Datas            : 213 <= x < 290
+      Setor Cadastro/Usuário: 290 <= x < 390
+      Status           : 390 <= x < 487   (Situação column)
+      Setor Atual      : 487 <= x < 581
+      Tipo             : 581 <= x < 676
+      Titulo           : 676 <= x < 772
+      Dias             : x >= 772
     """
     processes = []
 
@@ -46,16 +47,18 @@ def parse_pdf(pdf_path, progress_callback=None, cancel_check=None):
 
     # Column X boundaries derived from PDF header row bounding-box analysis
     # Actual word positions observed:
+    #   "Setor de Cadastro / Usuário" header/value: x ~ 292.5, ends before 389
     #   Status words (ANDAMENTO etc): x ~ 389.0
     #   NUCLEO (start of Setor Atual): x ~ 485.4
     #   First word of Tipo:            x ~ 581.7 (varies by content)
-    COL_ID_END      = 85
-    COL_CONTRIB_END = 213
-    COL_DATAS_END   = 388   # Status starts at x=389, so cut before it
-    COL_STATUS_END  = 484   # NUCLEO starts at x=485.4, cut before it
-    COL_SETOR_END   = 580   # Tipo starts at x=581.7 or higher
-    COL_TIPO_END    = 676
-    COL_TITULO_END  = 772
+    COL_ID_END       = 85
+    COL_CONTRIB_END  = 213
+    COL_DATAS_END    = 290   # "Setor" (Setor de Cadastro/Usuário) starts at x=292.5, cut before it
+    COL_SETOR_CAD_END = 388  # Status starts at x=389, so cut before it
+    COL_STATUS_END   = 484   # NUCLEO starts at x=485.4, cut before it
+    COL_SETOR_END    = 580   # Tipo starts at x=581.7 or higher
+    COL_TIPO_END     = 676
+    COL_TITULO_END   = 772
 
 
     with pdfplumber.open(pdf_path) as pdf:
@@ -95,14 +98,15 @@ def parse_pdf(pdf_path, progress_callback=None, cancel_check=None):
                 row_words = sorted(row_words_unsorted, key=lambda w: w["x0"])
 
                 # Assign each word to its column based on x0 position
-                col_id       = []
-                col_contrib  = []
-                col_datas    = []
-                col_status   = []
-                col_setor_at = []
-                col_tipo     = []
-                col_titulo   = []
-                col_dias     = []
+                col_id         = []
+                col_contrib    = []
+                col_datas      = []
+                col_setor_cad  = []
+                col_status     = []
+                col_setor_at   = []
+                col_tipo       = []
+                col_titulo     = []
+                col_dias       = []
 
                 for w in row_words:
                     x = w["x0"]
@@ -113,6 +117,8 @@ def parse_pdf(pdf_path, progress_callback=None, cancel_check=None):
                         col_contrib.append(t)
                     elif x < COL_DATAS_END:
                         col_datas.append(t)
+                    elif x < COL_SETOR_CAD_END:
+                        col_setor_cad.append(t)
                     elif x < COL_STATUS_END:
                         col_status.append(t)
                     elif x < COL_SETOR_END:
@@ -149,6 +155,7 @@ def parse_pdf(pdf_path, progress_callback=None, cancel_check=None):
                 contribuinte = " ".join(cleaned_contrib).strip()
 
                 datas_text   = " ".join(col_datas).strip()
+                setor_cadastro_usuario = " ".join(col_setor_cad).strip()
                 status_raw   = " ".join(col_status).strip()
                 setor_atual  = " ".join(col_setor_at).strip()
                 tipo_raw     = " ".join(col_tipo).strip()
@@ -206,6 +213,7 @@ def parse_pdf(pdf_path, progress_callback=None, cancel_check=None):
                     "data_abertura": entry_date_str,
                     "ano": ano,
                     "status": status,
+                    "setor_cadastro_usuario": setor_cadastro_usuario,
                     "setor_atual": setor_atual,
                     "tipo_solicitacao": tipo_solicitacao,
                     "dias_atraso_pdf": days_delay_pdf,

@@ -10,6 +10,7 @@ import { format } from "date-fns";
 import { DatePickerWithRange } from "@/components/date-range-picker";
 import { ModeToggle as ThemeToggle } from "@/components/mode-toggle";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -44,6 +45,8 @@ export default function ProcessosPage() {
     const [exporting, setExporting] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
     const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+    const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+    const [exportSheetName, setExportSheetName] = useState('Processos');
     const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
@@ -240,6 +243,20 @@ export default function ProcessosPage() {
         } catch (error) {
             console.error("Falha ao cancelar upload", error);
             alert("Erro ao tentar cancelar o upload. Ele pode já ter terminado.");
+        }
+    };
+
+    const handleExport = async () => {
+        setExporting(true);
+        try {
+            const from = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
+            const to = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
+            await exportExcel(search, typeFilter, statusFilter, from, to, onlyDelayed, exportSheetName.trim());
+            setIsExportDialogOpen(false);
+        } catch (error) {
+            alert('Erro ao exportar arquivo Excel');
+        } finally {
+            setExporting(false);
         }
     };
 
@@ -624,17 +641,9 @@ export default function ProcessosPage() {
                                         variant="outline"
                                         size="sm"
                                         disabled={exporting || !processes?.total}
-                                        onClick={async () => {
-                                            setExporting(true);
-                                            try {
-                                                const from = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
-                                                const to = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
-                                                await exportExcel(search, typeFilter, statusFilter, from, to, onlyDelayed);
-                                            } catch (error) {
-                                                alert('Erro ao exportar arquivo Excel');
-                                            } finally {
-                                                setExporting(false);
-                                            }
+                                        onClick={() => {
+                                            setExportSheetName('Processos');
+                                            setIsExportDialogOpen(true);
                                         }}
                                         className="gap-1.5"
                                     >
@@ -689,7 +698,9 @@ export default function ProcessosPage() {
                                             <th className="px-4 py-3 font-medium">N&ordm; Proc. / Ano</th>
                                             <th className="px-4 py-3 font-medium">Contribuinte</th>
                                             <th className="px-4 py-3 font-medium">Data Abertura</th>
+                                            <th className="px-4 py-3 font-medium">Setor de Cadastro / Usu&aacute;rio</th>
                                             <th className="px-4 py-3 font-medium">Situa&ccedil;&atilde;o</th>
+                                            <th className="px-4 py-3 font-medium">Setor Atual</th>
                                             <th className="px-4 py-3 font-medium">Tipo de Solicita&ccedil;&atilde;o</th>
                                             <th className="px-4 py-3 font-medium text-right">Dias Atraso</th>
                                         </tr>
@@ -697,7 +708,7 @@ export default function ProcessosPage() {
                                     <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                                         {processes?.data.length === 0 ? (
                                             <tr>
-                                                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                                                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                                                     Nenhum registro encontrado.
                                                 </td>
                                             </tr>
@@ -706,6 +717,9 @@ export default function ProcessosPage() {
                                                 <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-200">{proc.id}</td>
                                                 <td className="px-4 py-3 text-slate-700 dark:text-slate-200">{proc.contribuinte}</td>
                                                 <td className="px-4 py-3 text-slate-500">{proc.data_abertura}</td>
+                                                <td className="px-4 py-3 truncate max-w-[200px] text-slate-700 dark:text-slate-200" title={proc.setor_cadastro_usuario}>
+                                                    {proc.setor_cadastro_usuario || '-'}
+                                                </td>
                                                 <td className="px-4 py-3">
                                                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
                         ${["ENCERRAMENTO", "DEFERIDO"].some(s => proc.status.includes(s)) ? "bg-green-100 text-green-700" :
@@ -715,6 +729,9 @@ export default function ProcessosPage() {
                                                                         "bg-gray-100 text-gray-700"}`}>
                                                         {proc.status}
                                                     </span>
+                                                </td>
+                                                <td className="px-4 py-3 truncate max-w-[200px] text-slate-700 dark:text-slate-200" title={proc.setor_atual}>
+                                                    {proc.setor_atual || '-'}
                                                 </td>
                                                 <td className="px-4 py-3 truncate max-w-[200px] text-slate-700 dark:text-slate-200" title={proc.tipo_solicitacao}>
                                                     {proc.tipo_solicitacao}
@@ -754,6 +771,16 @@ export default function ProcessosPage() {
                                         </div>
                                         <p className="text-sm text-slate-700 dark:text-slate-300">{proc.contribuinte}</p>
                                         <p className="text-xs text-slate-500 truncate" title={proc.tipo_solicitacao}>{proc.tipo_solicitacao}</p>
+                                        {proc.setor_cadastro_usuario && (
+                                            <p className="text-xs text-slate-400 truncate" title={proc.setor_cadastro_usuario}>
+                                                <span className="font-medium">Setor de Cadastro/Usu&aacute;rio:</span> {proc.setor_cadastro_usuario}
+                                            </p>
+                                        )}
+                                        {proc.setor_atual && (
+                                            <p className="text-xs text-slate-400 truncate" title={proc.setor_atual}>
+                                                <span className="font-medium">Setor Atual:</span> {proc.setor_atual}
+                                            </p>
+                                        )}
                                         <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
                                             <span className="text-xs text-slate-400">{proc.data_abertura}</span>
                                             {proc.is_atrasado ? (
@@ -825,6 +852,39 @@ export default function ProcessosPage() {
                         periodoFim={dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : null}
                         accessToken={(session as any)?.accessToken || ""}
                     />
+
+                    <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>Exportar Excel</DialogTitle>
+                                <DialogDescription>
+                                    Informe o nome que a aba da planilha terá.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <Input
+                                value={exportSheetName}
+                                onChange={(e) => setExportSheetName(e.target.value)}
+                                maxLength={31}
+                                placeholder="Processos"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleExport();
+                                }}
+                            />
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setIsExportDialogOpen(false)}>
+                                    Cancelar
+                                </Button>
+                                <Button onClick={handleExport} disabled={exporting}>
+                                    {exporting ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        'Exportar'
+                                    )}
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                 </>
             )}
         </main>

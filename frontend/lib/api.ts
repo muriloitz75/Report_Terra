@@ -50,6 +50,7 @@ export interface Process {
     data_abertura: string;
     ano: string;
     status: string;
+    setor_cadastro_usuario: string;
     setor_atual: string;
     tipo_solicitacao: string;
     dias_atraso_pdf: number;
@@ -132,16 +133,21 @@ export const getProcesses = async (page = 1, limit = 10, search = '', typeFilter
     return response.data;
 };
 
-export const exportExcel = async (search = '', typeFilter: string[] = [], statusFilter: string[] = [], startDate = '', endDate = '', onlyDelayed = false): Promise<void> => {
+export const exportExcel = async (search = '', typeFilter: string[] = [], statusFilter: string[] = [], startDate = '', endDate = '', onlyDelayed = false, sheetName = ''): Promise<void> => {
     const typeParam = typeFilter.join(',');
     const statusParam = statusFilter.join(',');
-    const params = { search, type_filter: typeParam, status_filter: statusParam, start_date: startDate, end_date: endDate, only_delayed: onlyDelayed };
+    const params = { search, type_filter: typeParam, status_filter: statusParam, start_date: startDate, end_date: endDate, only_delayed: onlyDelayed, sheet_name: sheetName };
 
     const response = await api.get('/export-excel', { params, responseType: 'blob' });
 
     const contentDisposition = response.headers['content-disposition'];
-    const filenameMatch = contentDisposition?.match(/filename="?(.+?)"?$/);
-    const filename = filenameMatch ? filenameMatch[1] : 'Report_Terra_Processos.xlsx';
+    const filenameStarMatch = contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i);
+    const filenameMatch = contentDisposition?.match(/filename="([^"]+)"/);
+    const filename = filenameStarMatch
+        ? decodeURIComponent(filenameStarMatch[1])
+        : filenameMatch
+            ? filenameMatch[1]
+            : 'Report_Terra_Processos.xlsx';
 
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
