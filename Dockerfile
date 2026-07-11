@@ -16,7 +16,7 @@ FROM node:22-alpine
 WORKDIR /app
 
 # Install Python for backend
-RUN apk add --no-cache python3 python3-dev py3-pip build-base libffi-dev curl
+RUN apk add --no-cache python3 python3-dev py3-pip build-base libffi-dev curl linux-headers
 
 # Setup Backend dependencies
 COPY requirements.txt .
