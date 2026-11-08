@@ -1,4 +1,5 @@
-#!/bin/sh
+#!/bin/bash
+# bash (e não sh): o "wait -n" abaixo não existe no dash do Debian
 set -e
 
 # Trap SIGTERM/SIGINT to gracefully shutdown both processes
