@@ -1,5 +1,6 @@
 # Stage 1: Build Frontend with standalone output
-FROM node:22-alpine AS frontend_build
+# Debian (glibc), igual ao estágio final: os módulos nativos do Next ficam compatíveis
+FROM node:22-bookworm-slim AS frontend_build
 
 WORKDIR /app/frontend
 
@@ -11,12 +12,14 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Production Environment
-FROM node:22-alpine
+# Debian em vez de Alpine: pandas e numpy instalam de wheels prontos, sem compilar
+FROM node:22-bookworm-slim
 
 WORKDIR /app
 
 # Install Python for backend
-RUN apk add --no-cache python3 python3-dev py3-pip build-base libffi-dev curl linux-headers
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Setup Backend dependencies
 COPY requirements.txt .
@@ -37,9 +40,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV BACKEND_API_URL=http://127.0.0.1:8000
 ENV AUTH_TRUST_HOST=true
-# AUTH_SECRET para NextAuth - sobrescreva no Railway com valor próprio
-ENV AUTH_SECRET=BiKvv86s2w9c2PKCOSnawKoEgTUXeiM-4YGXQb5oHFQ
-ENV SECRET_KEY=RCxwTuUgyyz6lrcDk4ApWd7cK_FgCzTcu_C24WWtDig
+# O Next standalone escuta em HOSTNAME; sem isto, escutaria só no hostname do container
+ENV HOSTNAME=0.0.0.0
+# AUTH_SECRET e SECRET_KEY vêm das variáveis do Railway (nunca no código)
 
 # Criar script de inicialização com supervisão do backend
 COPY start.sh /app/start.sh
@@ -48,5 +51,5 @@ RUN chmod +x /app/start.sh
 # Expor porta do frontend (principal)
 EXPOSE 3000
 
-# Comando de Inicialização
-CMD ["/app/start.sh"]
+# Comando de Inicialização (bash: o start.sh usa "wait -n", que o sh do Debian não tem)
+CMD ["bash", "/app/start.sh"]
