@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
-import { Loader2, Share2, Maximize2, Minimize2 } from "lucide-react";
+import { Loader2, Share2, Maximize2, Minimize2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import * as htmlToImage from "html-to-image";
 
@@ -227,7 +227,16 @@ export function StatisticsModal({
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="ml-auto sm:ml-1 h-8 w-8"
+                                    className="ml-auto sm:ml-1 h-8 w-8 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/40"
+                                    title="Baixar imagem do gráfico"
+                                    onClick={downloadPng}
+                                >
+                                    <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
                                     title="Compartilhar gráfico"
                                     onClick={() => shareNative(composeMessage())}
                                 >
