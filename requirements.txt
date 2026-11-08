@@ -1,32 +1,37 @@
+# Versões fixadas no que foi instalado e testado no build de 08/11/2026 (Debian, Python 3.11).
+# Antes, faixas abertas (>=) deixavam cada build puxar a versão mais nova: o SQLAlchemy 2.1
+# chegou assim e mudou o driver padrão do Postgres. Para atualizar, mude a versão aqui e teste.
 fastapi==0.115.6
-uvicorn[standard]>=0.34.0
+uvicorn[standard]==0.54.0
 numpy==1.26.4
 pandas==2.2.3
 pdfplumber==0.11.4
-python-multipart>=0.0.18
+python-multipart==0.0.33
 xlsxwriter==3.2.0
 
-# LangChain ecosystem - versões atualizadas e compatíveis
-langchain>=0.3.14
-langchain-openai>=0.2.14
-langchain-community>=0.3.14
-langchain-core>=0.3.29
-langchain-anthropic>=0.3.1
-langchain-google-genai>=2.0.1
-langchain-huggingface>=0.1.2
+# LangChain ecosystem
+langchain==1.4.9
+langchain-openai==1.7.4
+langchain-community==0.4.2
+langchain-core==1.7.6
+langchain-anthropic==1.7.10
+langchain-google-genai==4.4.3
+langchain-huggingface==1.2.3
 
-python-jose[cryptography]
+python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
-pydantic[email]>=2.0.0
-pydantic-settings>=2.0.0
+pydantic[email]==2.14.3
+pydantic-settings==2.15.0
 
 # Produção
 gunicorn==21.2.0
 python-dotenv==1.0.0
-aiofiles
-requests
+aiofiles==25.1.0
+requests==2.34.2
 
 # Banco de Dados
-sqlalchemy>=2.0.0
-psycopg2-binary>=2.9.9
+# SQLAlchemy 2.1 usa psycopg (v3) por padrão em postgresql://; a DATABASE_URL no Railway
+# usa postgresql+psycopg2:// para casar com o driver abaixo.
+sqlalchemy==2.1.8
+psycopg2-binary==2.9.13
